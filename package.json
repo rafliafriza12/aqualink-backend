@@ -1,0 +1,24 @@
+{
+  "name": "aqualink-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "server.js",
+  "repository": "https://github.com/rafliafriza12/aqualink-backend.git",
+  "author": "rafliafriza12 <rafliafriza90@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.7.9",
+    "bcryptjs": "^2.4.3",
+    "body-parser": "^1.20.3",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "jsonwebtoken": "^9.0.2",
+    "midtrans-client": "^1.4.2",
+    "mongoose": "^8.9.3",
+    "uuid": "^11.0.5"
+  },
+  "scripts": {
+    "start": "nodemon server.js"
+  }
+}
