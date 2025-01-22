@@ -55,12 +55,12 @@ const WaterCredit = new mongoose.Schema(
       defaultf: 0,
     },
     withdrawl: {
-      type: String,
+      type: Number,
       required: true,
       default: 0,
     },
     totalUser: {
-      type: String,
+      type: Number,
       required: true,
       default: 0,
     },

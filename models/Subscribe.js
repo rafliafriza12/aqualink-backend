@@ -39,6 +39,11 @@ const Subscribe = mongoose.Schema(
       required: true,
       default: true,
     },
+    isPipeClose: {
+      type: Boolean,
+      required: true,
+      default: false,
+    },
   },
   { timestamps: true }
 );
