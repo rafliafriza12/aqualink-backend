@@ -8,6 +8,7 @@ import userRouter from "./routes/userRouter.js";
 import reportRouter from "./routes/reportRouter.js";
 import transactionRouter from "./routes/transactionRoutes.js";
 import paymentRouter from "./routes/paymentRouter.js";
+import waterCreditRouter from "./routes/waterCreditRoutes.js";
 const app = express();
 const port = 5000;
 
@@ -40,6 +41,7 @@ app.use("/users", userRouter);
 app.use("/report", reportRouter);
 app.use("/transactions", transactionRouter);
 app.use("/midtrans", paymentRouter);
+app.use("/waterCredit", waterCreditRouter);
 
 connectDB()
   .then(() => {

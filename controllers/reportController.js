@@ -47,6 +47,12 @@ export const getAllReports = [
   async (req, res) => {
     try {
       const reports = await Reports.find();
+      if (reports.length === 0) {
+        return res.status(404).json({
+          status: 404,
+          message: "reports not found",
+        });
+      }
       res.status(200).json({
         status: 200,
         data: reports,
