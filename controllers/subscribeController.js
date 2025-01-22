@@ -101,10 +101,10 @@ export const incrementUsedWater = async (req, res) => {
 
 export const isBalanceZero = async (req, res) => {
   try {
-    const { customerId, waterCreditId } = req.params;
+    const { userId, waterCreditId } = req.params;
     let isPipeClose = false;
     // Validasi input
-    if (!customerId || !waterCreditId) {
+    if (!userId || !waterCreditId) {
       return res.status(400).json({
         status: 400,
         message: "customerId and waterCreditId are required",
@@ -112,12 +112,12 @@ export const isBalanceZero = async (req, res) => {
     }
 
     // Cari wallet berdasarkan userId (customerId)
-    const wallet = await Wallet.findOne({ userId: customerId });
+    const wallet = await Wallet.findOne({ userId: userId });
 
     if (!wallet) {
       return res.status(404).json({
         status: 404,
-        message: "Wallet not found for the given customerId",
+        message: "Wallet not found for the given userId",
       });
     }
 
@@ -126,7 +126,7 @@ export const isBalanceZero = async (req, res) => {
       isPipeClose = true;
       // Update isPipeClose menjadi true pada subscription
       const updatedSubscribe = await Subscribe.findOneAndUpdate(
-        { "customerDetail.id": customerId, waterCreditId },
+        { "customerDetail.id": userId, waterCreditId },
         { isPipeClose: true },
         { new: true, upsert: false }
       );
