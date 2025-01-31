@@ -5,6 +5,7 @@ import {
   editWaterCredit,
   getAllWaterCredit,
   getWaterCreditByOwnerId,
+  getWaterCreditById,
 } from "../controllers/waterCreditController.js";
 
 const waterCreditRouter = express.Router();
@@ -17,5 +18,6 @@ waterCreditRouter.get(
   getWaterCreditByOwnerId
 );
 waterCreditRouter.get("/getAllWaterCredit", getAllWaterCredit);
+waterCreditRouter.get("/getWaterCreditById/:id", getWaterCreditById);
 
 export default waterCreditRouter;

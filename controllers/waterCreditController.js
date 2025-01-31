@@ -209,3 +209,39 @@ export const getAllWaterCredit = [
     }
   },
 ];
+
+export const getWaterCreditById = [
+  verifyToken,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      if (!id) {
+        return res.status(400).json({
+          status: 400,
+          message: "Water Credit ID is required, but not provide",
+        });
+      }
+
+      const waterCredit = await WaterCredits.findById(id);
+
+      if (!waterCredit) {
+        return res.status(404).json({
+          status: 404,
+          message: "Water Credit Not Found",
+        });
+      }
+
+      return res.status(200).json({
+        status: 200,
+        data: waterCredit,
+        message: "Water Credit Found",
+      });
+    } catch (err) {
+      return res.status(500).json({
+        status: 500,
+        message: "Internal Server Error",
+      });
+    }
+  },
+];
