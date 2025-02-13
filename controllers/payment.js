@@ -57,7 +57,7 @@ export const createPayment = [
       });
     } catch (error) {
       console.error("Error creating transaction:", error);
-      res.status(500).json({ message: "Failed to create transaction" });
+      res.status(500).json({ message: error });
     }
   },
 ];
