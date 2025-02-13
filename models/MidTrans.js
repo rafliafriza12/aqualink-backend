@@ -7,12 +7,6 @@ const transactionSchema = new mongoose.Schema(
     paymentMethod: {
       type: String,
       required: true,
-      enum: ["bank_transfer", "gopay", "credit_card"], // Daftar metode pembayaran yang didukung
-    },
-    paymentType: { type: String, required: true },
-    transactionStatus: {
-      type: String,
-      required: true,
       enum: [
         "bank_transfer",
         "gopay",
@@ -27,7 +21,13 @@ const transactionSchema = new mongoose.Schema(
         "akulaku",
         "indomaret",
         "alfamart",
-      ],
+      ], // Daftar metode pembayaran yang didukung
+    },
+    paymentType: { type: String, required: true },
+    transactionStatus: {
+      type: String,
+      required: true,
+      enum: ["pending", "success", "failed", "cancelled"], // Status transaksi
       default: "pending",
     },
     customerDetails: {
