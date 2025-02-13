@@ -13,7 +13,21 @@ const transactionSchema = new mongoose.Schema(
     transactionStatus: {
       type: String,
       required: true,
-      enum: ["pending", "success", "failed", "cancelled"], // Status transaksi
+      enum: [
+        "bank_transfer",
+        "gopay",
+        "credit_card",
+        "bca_klikbca",
+        "bca_klikpay",
+        "bri_epay",
+        "cimb_clicks",
+        "danamon_online",
+        "qris",
+        "shopeepay",
+        "akulaku",
+        "indomaret",
+        "alfamart",
+      ],
       default: "pending",
     },
     customerDetails: {
