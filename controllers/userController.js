@@ -104,6 +104,76 @@ export const changePassword = [
   },
 ];
 
+export const editProfile = [
+  verifyToken,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { newFullName, newEmail } = req.body;
+
+      if (!id) {
+        return res.status(400).json({
+          status: 400,
+          message: "User ID is required, but not provided",
+        });
+      }
+
+      if (!newFullName || !newEmail) {
+        return res.status(400).json({
+          status: 400,
+          message: "All field is required, but not provided",
+        });
+      }
+
+      const emailAlreadyRegistered = await usersModel.findOne({
+        email: newEmail,
+      });
+      const nameAlreadyRegistered = await usersModel.findOne({
+        fullName: newFullName,
+      });
+
+      if (emailAlreadyRegistered) {
+        return res.status(400).json({
+          status: 400,
+          message: "Email already used",
+        });
+      }
+
+      if (nameAlreadyRegistered) {
+        return res.status(400).json({
+          status: 400,
+          message: "Name already used",
+        });
+      }
+
+      const user = await usersModel.findById(id);
+
+      if (!user) {
+        return res.status(404).json({
+          status: 404,
+          message: "User not found",
+        });
+      }
+
+      user.set("fullName", newFullName);
+      user.set("email", newEmail);
+
+      await user.save();
+
+      return res.status(200).json({
+        status: 200,
+        data: user,
+        message: "Edit Profile successfully",
+      });
+    } catch (error) {
+      return res.status(500).json({
+        status: 500,
+        message: "Internal server error",
+      });
+    }
+  },
+];
+
 export const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
