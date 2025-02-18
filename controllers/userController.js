@@ -2,6 +2,7 @@ import usersModel from "../models/User.js";
 import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Wallet from "../models/Wallet.js";
+import { verifyToken } from "../middleware/auth.js";
 
 export const registerUser = async (req, res, next) => {
   try {
@@ -52,6 +53,56 @@ export const registerUser = async (req, res, next) => {
     res.status(500).json(err);
   }
 };
+
+export const changePassword = [
+  verifyToken,
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { newPassword } = req.body;
+      if (!id) {
+        return res.status(400).json({
+          status: 400,
+          message: "User ID is required, but not provided",
+        });
+      }
+
+      if (!newPassword) {
+        return res.status(400).json({
+          status: 400,
+          message: "New password is required, but not provided",
+        });
+      }
+
+      const user = await usersModel.findById(id);
+
+      if (!user) {
+        return res.status(404).json({
+          status: 404,
+          message: "User Not Found",
+        });
+      }
+
+      bcryptjs.hash(newPassword, 10, async (err, hash) => {
+        if (err) {
+          return res.status(500).json(err);
+        }
+
+        user.set("password", hash);
+        await user.save();
+
+        return res
+          .status(200)
+          .json({ data: user, message: "Change Password successfully." });
+      });
+    } catch (error) {
+      return res.status(500).json({
+        status: 500,
+        message: "Internal Server Error",
+      });
+    }
+  },
+];
 
 export const loginUser = async (req, res, next) => {
   try {
