@@ -14,6 +14,34 @@ export const createPayment = [
       // Buat orderId menggunakan UUID
       const orderId = uuidv4();
 
+      if (!id) {
+        return res.status(400).json({
+          status: 400,
+          message: "User ID is required, but not provided",
+        });
+      }
+
+      if (!amount) {
+        return res.status(400).json({
+          status: 400,
+          message: "Isi nominal top up terlebih dahulu",
+        });
+      }
+
+      if (!customerDetails) {
+        return res.status(400).json({
+          status: 400,
+          message: "Data user dibutuhkan, coba login ulang terlebih dahulu",
+        });
+      }
+
+      if (!paymentMethod) {
+        return res.status(400).json({
+          status: 400,
+          message: "Pilih metode pembayaran terlebih dahulu",
+        });
+      }
+
       // Data untuk transaksi ke Midtrans
       const parameter = {
         transaction_details: {
