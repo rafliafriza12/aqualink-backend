@@ -28,6 +28,13 @@ export const createPayment = [
         });
       }
 
+      if (amount < 10000) {
+        return res.status(400).json({
+          status: 400,
+          message: "Nominal top up minimal Rp.10.000",
+        });
+      }
+
       if (!customerDetails) {
         return res.status(400).json({
           status: 400,
