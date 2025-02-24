@@ -14,13 +14,13 @@ export const createReport = [
       if (!reporterID || !reporterName || !problem || !address || !coordinate) {
         return res.status(400).json({
           status: 400,
-          message: "All fields are required.",
+          message: "Semua kolom harus diisi.",
         });
       }
       if (!coordinate.longitude || !coordinate.latitude) {
         return res.status(400).json({
           status: 400,
-          message: "Longitude and latitude are required.",
+          message: "Longitude dan latitude diperlukan.",
         });
       }
 
@@ -30,7 +30,7 @@ export const createReport = [
       res.status(201).json({
         status: 201,
         data: savedReport,
-        message: "Report created successfull",
+        message: "Laporan berhasil dibuat",
       });
     } catch (error) {
       res.status(500).json({
@@ -50,7 +50,7 @@ export const getAllReports = [
       if (reports.length === 0) {
         return res.status(404).json({
           status: 404,
-          message: "reports not found",
+          message: "Laporan tidak ditemukan",
         });
       }
       res.status(200).json({
@@ -77,7 +77,7 @@ export const editReport = [
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({
           status: 400,
-          message: "Invalid report ID.",
+          message: "ID laporan tidak valid.",
         });
       }
 
@@ -89,14 +89,14 @@ export const editReport = [
       if (!updatedReport) {
         return res.status(404).json({
           status: 404,
-          message: "Report not found.",
+          message: "Laporan tidak ditemukan.",
         });
       }
 
       res.status(200).json({
         status: 200,
         data: updatedReport,
-        message: "Report updated successfull",
+        message: "Laporan berhasil diperbarui",
       });
     } catch (error) {
       res.status(500).json({
@@ -118,7 +118,7 @@ export const deleteReport = [
       if (!mongoose.Types.ObjectId.isValid(id)) {
         return res.status(400).json({
           status: 400,
-          message: "Invalid report ID.",
+          message: "ID laporan tidak valid.",
         });
       }
 
@@ -126,14 +126,14 @@ export const deleteReport = [
       if (!deletedReport) {
         return res.status(404).json({
           status: 404,
-          message: "Report not found.",
+          message: "Laporan tidak ditemukan.",
         });
       }
 
       res.status(200).json({
         status: 200,
         data: deletedReport,
-        message: "Report deleted successfully.",
+        message: "Laporan berhasil dihapus.",
       });
     } catch (error) {
       res.status(500).json({
@@ -155,7 +155,7 @@ export const getByReporterID = [
       if (!reporterID) {
         return res.status(400).json({
           status: 400,
-          message: "Reporter ID is required.",
+          message: "ID Pelapor diperlukan.",
         });
       }
 
@@ -165,14 +165,15 @@ export const getByReporterID = [
       if (reports.length === 0) {
         return res.status(404).json({
           status: 404,
-          message: "No reports found for the given Reporter ID.",
+          message:
+            "Tidak ada laporan yang ditemukan untuk ID Pelapor tersebut.",
         });
       }
 
       res.status(200).json({
         status: 200,
         data: reports,
-        message: "Reports founded",
+        message: "Laporan ditemukan",
       });
     } catch (error) {
       res.status(500).json({

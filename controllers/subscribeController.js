@@ -3,6 +3,7 @@ import Wallet from "../models/Wallet.js";
 import mongoose from "mongoose";
 import WaterCredits from "../models/WaterCredits.js";
 import { verifyToken } from "../middleware/auth.js";
+import Notification from "../models/Notification.js";
 
 export const createSubscribe = [
   verifyToken,
@@ -19,7 +20,7 @@ export const createSubscribe = [
       ) {
         return res.status(400).json({
           status: 400,
-          message: "All field is required",
+          message: "Semua kolom harus diisi",
         });
       }
 
@@ -32,7 +33,7 @@ export const createSubscribe = [
       if (!updatedWaterCredit) {
         return res.status(404).json({
           status: 404,
-          message: "Water credit not found",
+          message: "Kredit air tidak ditemukan",
         });
       }
 
@@ -43,15 +44,25 @@ export const createSubscribe = [
 
       await newSubscribe.save();
 
+      // Create a notification for successful subscription
+      const subscribeNotification = new Notification({
+        userId: customerDetail.id,
+        title: "Langganan Dibuat",
+        message: "Anda telah berhasil berlangganan layanan air.",
+        category: "INFORMASI",
+      });
+
+      await subscribeNotification.save();
+
       return res.status(201).json({
         status: 201,
         data: newSubscribe,
-        message: "Subcribe created successfully",
+        message: "Berhasil membuat langganan",
       });
     } catch (error) {
       return res.status(500).json({
         status: 500,
-        message: "Internal server error" + error,
+        message: "Kesalahan server internal" + error,
       });
     }
   },
@@ -65,7 +76,7 @@ export const getSubscribeByUserId = [
       if (!userId) {
         return res.status(400).json({
           status: 400,
-          message: "User ID is required, but not provided",
+          message: "ID Pengguna diperlukan, tetapi tidak disediakan",
         });
       }
 
@@ -127,13 +138,13 @@ export const getSubscribeByUserId = [
       if (!subscriptions || subscriptions.length === 0) {
         return res.status(404).json({
           status: 404,
-          message: "No subscriptions found for this user",
+          message: "Tidak ada langganan yang ditemukan untuk pengguna ini",
         });
       }
 
       return res.status(200).json({
         status: 200,
-        message: "Successfully retrieved water credits data",
+        message: "Berhasil mengambil data kredit air",
         data: {
           userId,
           totalSubscriptions: subscriptions.length,
@@ -144,7 +155,7 @@ export const getSubscribeByUserId = [
       console.error("Error in getSubscribeByUserId:", error);
       return res.status(500).json({
         status: 500,
-        message: "Internal server error",
+        message: "Kesalahan server internal",
         error: error.message,
       });
     }
@@ -177,107 +188,134 @@ const checkBillingDue = (lastUpdatedAt, billingTime) => {
 
 export const incrementUsedWater = async (req, res) => {
   try {
-    const { userId, waterCreditId } = req.params; // Dapatkan userId dan waterCreditId dari params
-    const { usedWater } = req.body; // Ambil usedWater dari body
+    const { userId, waterCreditId } = req.params;
+    const { usedWater } = req.body;
 
-    // Validasi input
+    // Validate input
     if (!userId || !waterCreditId || typeof usedWater === "undefined") {
       return res.status(400).json({
         status: 400,
-        message: "All fields are required",
+        message: "Semua kolom harus diisi",
       });
     }
 
-    // Cari subscription berdasarkan userId dan waterCreditId
-    const subscription = await Subscribe.findOne({
-      "customerDetail.id": userId,
-      waterCreditId: waterCreditId,
-    });
+    // Find subscription and water credit in parallel
+    const [subscription, waterCredit] = await Promise.all([
+      Subscribe.findOne({
+        "customerDetail.id": userId,
+        waterCreditId: waterCreditId,
+      }),
+      WaterCredits.findById(waterCreditId),
+    ]);
 
     if (!subscription) {
       return res.status(404).json({
         status: 404,
-        message: "Subscription not found",
+        message: "Langganan tidak ditemukan",
       });
     }
 
-    // Update usedWaterInTempo terlebih dahulu
-    subscription.usedWaterInTempo += usedWater; // Tambahkan nilai baru ke usedWaterInTempo
-    await subscription.save(); // Simpan perubahan
-
-    // Cari water credit berdasarkan waterCreditId
-    const waterCredit = await WaterCredits.findById(waterCreditId);
     if (!waterCredit) {
       return res.status(404).json({
         status: 404,
-        message: "Water credit not found",
+        message: "Kredit air tidak ditemukan",
       });
     }
 
-    // Cek apakah jatuh tempo pembayaran berdasarkan billingTime
+    // Save history and update subscription in parallel
+    const historyEntry = new HistoryUsage({ userId, waterCreditId, usedWater });
+    subscription.usedWaterInTempo += usedWater;
+
+    await Promise.all([historyEntry.save(), subscription.save()]);
+
+    // Check billing due
     const isDue = checkBillingDue(
       subscription.updatedAt,
       waterCredit.billingTime
     );
     if (!isDue) {
-      // Jika belum jatuh tempo, kembalikan response sukses
       return res.status(200).json({
         status: 200,
-        message: "Water usage updated, billing not due yet",
+        message: "Penggunaan air diperbarui, tagihan belum jatuh tempo",
         data: subscription,
+        history: historyEntry,
       });
     }
 
-    // Jika jatuh tempo, proses pembayaran
+    // Process payment if due
     const wallet = await Wallet.findOne({ userId });
     if (!wallet) {
       return res.status(404).json({
         status: 404,
-        message: "Wallet not found",
+        message: "Dompet tidak ditemukan",
       });
     }
 
     const costPerLiter = waterCredit.cost / waterCredit.perLiter;
     const totalCost = subscription.usedWaterInTempo * costPerLiter;
-    // Jika saldo tidak mencukupi, bayar sebagian
-    let paidWater = subscription.usedWaterInTempo; // Jumlah liter yang akan dibayar
-    let actualPayment = totalCost; // Jumlah biaya yang dibayar
 
-    if (wallet.balance < totalCost) {
-      paidWater = Math.floor(wallet.balance / costPerLiter); // Hitung liter yang bisa dibayar
-      actualPayment = paidWater * costPerLiter; // Biaya aktual berdasarkan liter yang bisa dibayar
-    }
+    // Calculate payment amounts
+    const paidWater =
+      wallet.balance < totalCost
+        ? Math.floor(wallet.balance / costPerLiter)
+        : subscription.usedWaterInTempo;
+    const actualPayment = paidWater * costPerLiter;
 
+    // Process transaction
     const session = await mongoose.startSession();
-    session.startTransaction();
 
     try {
-      // Update subscription
+      session.startTransaction();
+
+      // Update all documents atomically
       subscription.totalUsedWater += paidWater;
-      subscription.usedWaterInTempo -= paidWater; // Sisa air yang belum dibayar
-      await subscription.save({ session });
-
-      // Update wallet
+      subscription.usedWaterInTempo -= paidWater;
       wallet.balance -= actualPayment;
-      await wallet.save({ session });
-
-      // Update income pada water credit
       waterCredit.income += actualPayment;
       waterCredit.totalIncome += actualPayment;
-      await waterCredit.save({ session });
+
+      // Create notification for billing due
+      const billingNotification = new Notification({
+        userId,
+        title: "Tagihan Air Jatuh Tempo",
+        message: `Tagihan air Anda untuk periode ${waterCredit.billingTime} telah jatuh tempo. Total tagihan: Rp${totalCost}`,
+        category: "TRANSAKSI",
+        link: `/billing/${userId}`,
+      });
+
+      // Create notification for balance deduction
+      const paymentNotification = new Notification({
+        userId,
+        title: "Pemotongan Saldo",
+        message: `Saldo Anda telah dipotong sebesar Rp${actualPayment} untuk pembayaran tagihan air periode ${waterCredit.billingTime}`,
+        category: "TRANSAKSI",
+        link: `/billing/${userId}`,
+      });
+
+      await Promise.all([
+        subscription.save({ session }),
+        wallet.save({ session }),
+        waterCredit.save({ session }),
+        billingNotification.save({ session }),
+        paymentNotification.save({ session }),
+      ]);
 
       await session.commitTransaction();
 
-      res.status(200).json({
+      return res.status(200).json({
         status: 200,
         message:
           wallet.balance >= totalCost
-            ? "Billing processed successfully"
-            : "Partial payment processed due to insufficient balance",
+            ? "Tagihan berhasil diproses"
+            : "Pembayaran sebagian diproses karena saldo tidak mencukupi",
         data: {
           subscription,
           wallet,
           waterCredit,
+          notifications: {
+            billing: billingNotification,
+            payment: paymentNotification,
+          },
           paymentDetails: {
             paidWater,
             actualPayment,
@@ -293,9 +331,10 @@ export const incrementUsedWater = async (req, res) => {
     }
   } catch (error) {
     console.error("Error handling water usage and billing:", error);
-    res.status(500).json({
+    return res.status(500).json({
       status: 500,
-      message: "Internal server error",
+      message: "Kesalahan server internal",
+      error: error.message,
     });
   }
 };
@@ -308,7 +347,7 @@ export const isBalanceZero = async (req, res) => {
     if (!userId || !waterCreditId) {
       return res.status(400).json({
         status: 400,
-        message: "customerId and waterCreditId are required",
+        message: "ID pelanggan dan ID kredit air diperlukan",
       });
     }
 
@@ -318,7 +357,7 @@ export const isBalanceZero = async (req, res) => {
     if (!wallet) {
       return res.status(404).json({
         status: 404,
-        message: "Wallet not found for the given userId",
+        message: "Dompet tidak ditemukan untuk ID pengguna yang diberikan",
       });
     }
 
@@ -335,27 +374,37 @@ export const isBalanceZero = async (req, res) => {
       if (!updatedSubscribe) {
         return res.status(404).json({
           status: 404,
-          message: "Subscription not found",
+          message: "Langganan tidak ditemukan",
         });
       }
+
+      // Create notification for pipe closure
+      const pipeCloseNotification = new Notification({
+        userId,
+        title: "Pipa Ditutup",
+        message: "Pipa air Anda telah ditutup karena saldo nol.",
+        category: "INFORMASI",
+      });
+
+      await pipeCloseNotification.save();
 
       return res.status(200).json({
         status: 200,
         data: isPipeClose,
-        message: "Balance is zero, pipe is now closed",
+        message: "Saldo habis, pipa sekarang ditutup",
       });
     } else {
       return res.status(200).json({
         status: 200,
         data: isPipeClose,
-        message: "Balance is not zero, no changes made to the pipe status",
+        message: "Saldo tidak nol, tidak ada perubahan pada status pipa",
       });
     }
   } catch (error) {
     console.error("Error in isBalanceZero:", error);
     res.status(500).json({
       status: 500,
-      message: "Internal server error",
+      message: "Kesalahan server internal",
     });
   }
 };
@@ -368,7 +417,7 @@ export const getSubscribeByOwnerId = [
       if (!id) {
         return res.status(400).json({
           status: 400,
-          message: "Owner ID is required, but not provided",
+          message: "ID pemilik diperlukan, tetapi tidak disediakan",
         });
       }
 
@@ -437,13 +486,13 @@ export const getSubscribeByOwnerId = [
       if (!subscriptions || subscriptions.length === 0) {
         return res.status(404).json({
           status: 404,
-          message: "No subscriptions found for this owner",
+          message: "Tidak ada langganan yang ditemukan untuk pemilik ini",
         });
       }
 
       return res.status(200).json({
         status: 200,
-        message: "Successfully retrieved subscribers data",
+        message: "Berhasil mengambil data pelanggan",
         data: {
           totalSubscribers: subscriptions.length,
           subscriptions,
@@ -453,7 +502,7 @@ export const getSubscribeByOwnerId = [
       console.error("Error in getSubscribeByOwnerId:", err);
       return res.status(500).json({
         status: 500,
-        message: "Internal server error",
+        message: "Kesalahan server internal",
         error: err.message,
       });
     }
@@ -469,7 +518,7 @@ export const getSubscribeById = [
       if (!id) {
         return res.status(400).json({
           status: 400,
-          message: "Subsribe ID is required, but not provide",
+          message: "ID langganan diperlukan, tetapi tidak disediakan",
         });
       }
 
@@ -478,19 +527,82 @@ export const getSubscribeById = [
       if (!subscribe) {
         return res.status(404).json({
           status: 404,
-          message: "Subscriber not found",
+          message: "Pelanggan tidak ditemukan",
         });
       }
 
       return res.status(200).json({
         status: 200,
-        message: "Subscriber not founded",
+        message: "Pelanggan ditemukan",
         data: subscribe,
       });
     } catch (err) {
       return res.status(500).json({
         status: 500,
-        message: "Internal server error",
+        message: "Kesalahan server internal",
+      });
+    }
+  },
+];
+
+export const unsubscribe = [
+  verifyToken,
+  async (req, res) => {
+    try {
+      const { userId, waterCreditId } = req.params;
+
+      if (!userId || !waterCreditId) {
+        return res.status(400).json({
+          status: 400,
+          message: "ID Pengguna dan ID Kredit Air diperlukan.",
+        });
+      }
+
+      // Find the subscription
+      const subscription = await Subscribe.findOne({
+        "customerDetail.id": userId,
+        waterCreditId: waterCreditId,
+      });
+
+      if (!subscription) {
+        return res.status(404).json({
+          status: 404,
+          message: "Langganan tidak ditemukan.",
+        });
+      }
+
+      // Update the subscription status to inactive or remove it
+      subscription.subscribeStatus = "inactive"; // or use subscription.remove() to delete
+      await subscription.save();
+
+      // Optionally, update the totalUser count in WaterCredits
+      await WaterCredits.findByIdAndUpdate(
+        waterCreditId,
+        { $inc: { totalUser: -1 } },
+        { new: true, upsert: false }
+      );
+
+      // Optionally, create a notification for the user
+      const unsubscribeNotification = new Notification({
+        userId,
+        title: "Berhenti Berlangganan",
+        message: "Anda telah berhasil berhenti berlangganan dari layanan air.",
+        category: "INFORMASI",
+      });
+
+      await unsubscribeNotification.save();
+
+      return res.status(200).json({
+        status: 200,
+        message: "Berhasil berhenti berlangganan.",
+        data: subscription,
+      });
+    } catch (error) {
+      console.error("Error in unsubscribe:", error);
+      return res.status(500).json({
+        status: 500,
+        message: "Kesalahan server internal",
+        error: error.message,
       });
     }
   },

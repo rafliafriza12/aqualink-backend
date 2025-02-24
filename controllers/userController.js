@@ -10,13 +10,13 @@ export const registerUser = async (req, res, next) => {
     if (!email || !phone || !fullName || !password) {
       return res
         .status(400)
-        .json({ message: "Please fill all required fields." });
+        .json({ message: "Silakan isi semua kolom yang diperlukan." });
     } else {
       const isAlreadyRegistered = await usersModel.findOne({ email });
       if (isAlreadyRegistered) {
         return res
           .status(400)
-          .json({ message: "User with this email already exists." });
+          .json({ message: "Pengguna dengan email ini sudah terdaftar." });
       } else {
         const newUser = new usersModel({
           email,
@@ -45,7 +45,7 @@ export const registerUser = async (req, res, next) => {
 
           return res
             .status(200)
-            .json({ data: newUser, message: "User registered successfully." });
+            .json({ data: newUser, message: "Pengguna berhasil terdaftar." });
         });
       }
     }
@@ -63,14 +63,14 @@ export const changePassword = [
       if (!id) {
         return res.status(400).json({
           status: 400,
-          message: "User ID is required, but not provided",
+          message: "ID Pengguna diperlukan, tetapi tidak disediakan",
         });
       }
 
       if (!newPassword) {
         return res.status(400).json({
           status: 400,
-          message: "New password is required, but not provided",
+          message: "Kata sandi baru diperlukan, tetapi tidak disediakan",
         });
       }
 
@@ -79,7 +79,7 @@ export const changePassword = [
       if (!user) {
         return res.status(404).json({
           status: 404,
-          message: "User Not Found",
+          message: "Pengguna Tidak Ditemukan",
         });
       }
 
@@ -93,12 +93,12 @@ export const changePassword = [
 
         return res
           .status(200)
-          .json({ data: user, message: "Change Password successfully." });
+          .json({ data: user, message: "Kata sandi berhasil diubah." });
       });
     } catch (error) {
       return res.status(500).json({
         status: 500,
-        message: "Internal Server Error",
+        message: "Kesalahan Server Internal",
       });
     }
   },
@@ -114,14 +114,14 @@ export const editProfile = [
       if (!id) {
         return res.status(400).json({
           status: 400,
-          message: "User ID is required, but not provided",
+          message: "ID Pengguna diperlukan, tetapi tidak disediakan",
         });
       }
 
       if (!newFullName || !newEmail) {
         return res.status(400).json({
           status: 400,
-          message: "All field is required, but not provided",
+          message: "Semua kolom diperlukan, tetapi tidak disediakan",
         });
       }
 
@@ -135,14 +135,14 @@ export const editProfile = [
       if (emailAlreadyRegistered) {
         return res.status(400).json({
           status: 400,
-          message: "Email already used",
+          message: "Email sudah digunakan",
         });
       }
 
       if (nameAlreadyRegistered) {
         return res.status(400).json({
           status: 400,
-          message: "Name already used",
+          message: "Nama sudah digunakan",
         });
       }
 
@@ -151,7 +151,7 @@ export const editProfile = [
       if (!user) {
         return res.status(404).json({
           status: 404,
-          message: "User not found",
+          message: "Pengguna tidak ditemukan",
         });
       }
 
@@ -163,12 +163,12 @@ export const editProfile = [
       return res.status(200).json({
         status: 200,
         data: user,
-        message: "Edit Profile successfully",
+        message: "Profil berhasil diubah",
       });
     } catch (error) {
       return res.status(500).json({
         status: 500,
-        message: "Internal server error",
+        message: "Kesalahan server internal",
       });
     }
   },
@@ -180,19 +180,22 @@ export const loginUser = async (req, res, next) => {
     if (!email || !password) {
       return res
         .status(400)
-        .json({ status: 400, message: "Please fill all required fields." });
+        .json({
+          status: 400,
+          message: "Silakan isi semua kolom yang diperlukan.",
+        });
     } else {
       const user = await usersModel.findOne({ email });
       if (!user) {
         return res
           .status(400)
-          .json({ status: 400, message: "Email or password is incorrect." });
+          .json({ status: 400, message: "Email atau kata sandi salah." });
       } else {
         const validateUser = await bcryptjs.compare(password, user.password);
         if (!validateUser) {
           res
             .status(400)
-            .json({ status: 400, message: "Email or password is incorrect." });
+            .json({ status: 400, message: "Email atau kata sandi salah." });
         } else {
           const payload = {
             userId: user._id,
@@ -227,12 +230,14 @@ export const logoutUser = async (req, res) => {
     if (!userId) {
       return res
         .status(400)
-        .json({ status: 400, message: "User ID is required to logout." });
+        .json({ status: 400, message: "ID Pengguna diperlukan untuk keluar." });
     }
 
     const user = await usersModel.findById(userId);
     if (!user) {
-      return res.status(404).json({ status: 404, message: "User not found." });
+      return res
+        .status(404)
+        .json({ status: 404, message: "Pengguna tidak ditemukan." });
     }
 
     // Hapus atau atur token menjadi null
@@ -241,11 +246,11 @@ export const logoutUser = async (req, res) => {
 
     return res
       .status(200)
-      .json({ status: 200, message: "User logged out successfully." });
+      .json({ status: 200, message: "Pengguna berhasil keluar." });
   } catch (error) {
     console.error(error);
     res
       .status(500)
-      .json({ status: 500, message: "An error occurred while logging out." });
+      .json({ status: 500, message: "Terjadi kesalahan saat keluar." });
   }
 };

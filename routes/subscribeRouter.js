@@ -6,6 +6,7 @@ import {
   getSubscribeByUserId,
   getSubscribeByOwnerId,
   getSubscribeById,
+  unsubscribe,
 } from "../controllers/subscribeController.js";
 
 const subscribeRouter = express.Router();
@@ -16,5 +17,6 @@ subscribeRouter.get("/closePipe/:userId/:waterCreditId", isBalanceZero);
 subscribeRouter.get("/getSubscribeByUserId/:userId", getSubscribeByUserId);
 subscribeRouter.get("/getSubscribeById/:id", getSubscribeById);
 subscribeRouter.get("/getSubscribeByOwnerId/:id", getSubscribeByOwnerId);
+subscribeRouter.put("/unsubscribe/:userId/:waterCreditId", unsubscribe);
 
 export default subscribeRouter;

@@ -10,7 +10,7 @@ export const getWaterCreditByOwnerId = [
       if (!ownerId) {
         return res.status(400).json({
           status: 400,
-          message: "Owner ID is required but not provided.",
+          message: "ID Pemilik diperlukan, tetapi tidak disediakan.",
         });
       }
 
@@ -19,7 +19,8 @@ export const getWaterCreditByOwnerId = [
       if (waterCredits.length === 0) {
         return res.status(404).json({
           status: 404,
-          message: "No water credit found for the given owner ID.",
+          message:
+            "Tidak ada kredit air yang ditemukan untuk ID pemilik yang diberikan.",
         });
       }
 
@@ -28,14 +29,14 @@ export const getWaterCreditByOwnerId = [
         status: 200,
         data: waterCredits,
         message: `${waterCredits.length} ${
-          waterCredits.length === 1 ? "Water credit" : "Water credits"
-        } found.`,
+          waterCredits.length === 1 ? "Kredit air" : "Kredit air"
+        } ditemukan.`,
       });
     } catch (error) {
       // Tangani error dan kirimkan respons
       res.status(500).json({
         status: 500,
-        message: "An error occurred while retrieving water credits.",
+        message: "Terjadi kesalahan saat mengambil kredit air.",
         error: error.message,
       });
     }
@@ -64,7 +65,7 @@ export const createWaterCredit = [
       if (!owner || !cost || !perLiter || !location) {
         return res.status(400).json({
           status: 400,
-          message: "Required fields are missing.",
+          message: "Kolom yang diperlukan tidak lengkap.",
         });
       }
 
@@ -88,13 +89,13 @@ export const createWaterCredit = [
 
       res.status(201).json({
         status: 201,
-        message: "Water credit created successfully.",
+        message: "Kredit air berhasil dibuat.",
         data: newWaterCredit,
       });
     } catch (error) {
       res.status(500).json({
         status: 500,
-        message: "An error occurred while creating water credit.",
+        message: "Terjadi kesalahan saat membuat kredit air.",
         error: error.message,
       });
     }
@@ -111,7 +112,7 @@ export const editWaterCredit = [
       if (!id) {
         return res.status(400).json({
           status: 400,
-          message: "ID is required but not provided.",
+          message: "ID diperlukan, tetapi tidak disediakan.",
         });
       }
 
@@ -125,19 +126,19 @@ export const editWaterCredit = [
       if (!updatedWaterCredit) {
         return res.status(404).json({
           status: 404,
-          message: "Water credit not found.",
+          message: "Kredit air tidak ditemukan.",
         });
       }
 
       res.status(200).json({
         status: 200,
-        message: "Water credit updated successfully.",
+        message: "Kredit air berhasil diperbarui.",
         data: updatedWaterCredit,
       });
     } catch (error) {
       res.status(500).json({
         status: 500,
-        message: "An error occurred while updating water credit.",
+        message: "Terjadi kesalahan saat memperbarui kredit air.",
         error: error.message,
       });
     }
@@ -153,7 +154,7 @@ export const deleteWaterCredit = [
       if (!id) {
         return res.status(400).json({
           status: 400,
-          message: "ID is required but not provided.",
+          message: "ID diperlukan, tetapi tidak disediakan.",
         });
       }
 
@@ -163,19 +164,19 @@ export const deleteWaterCredit = [
       if (!deletedWaterCredit) {
         return res.status(404).json({
           status: 404,
-          message: "Water credit not found.",
+          message: "Kredit air tidak ditemukan.",
         });
       }
 
       res.status(200).json({
         status: 200,
-        message: "Water credit deleted successfully.",
+        message: "Kredit air berhasil dihapus.",
         data: deletedWaterCredit,
       });
     } catch (error) {
       res.status(500).json({
         status: 500,
-        message: "An error occurred while deleting water credit.",
+        message: "Terjadi kesalahan saat menghapus kredit air.",
         error: error.message,
       });
     }
@@ -191,19 +192,19 @@ export const getAllWaterCredit = [
       if (waterCredits.length === 0) {
         return res.status(404).json({
           status: 404,
-          message: "No data yet",
+          message: "Belum ada data",
         });
       }
 
       res.status(200).json({
         status: 200,
         data: waterCredits,
-        message: "Water credit founded",
+        message: "Kredit air ditemukan",
       });
     } catch (error) {
       res.status(500).json({
         status: 500,
-        message: "An error occurred while deleting water credit.",
+        message: "Terjadi kesalahan saat mengambil kredit air.",
         error: error.message,
       });
     }
@@ -219,7 +220,7 @@ export const getWaterCreditById = [
       if (!id) {
         return res.status(400).json({
           status: 400,
-          message: "Water Credit ID is required, but not provide",
+          message: "ID Kredit Air diperlukan, tetapi tidak disediakan",
         });
       }
 
@@ -228,19 +229,19 @@ export const getWaterCreditById = [
       if (!waterCredit) {
         return res.status(404).json({
           status: 404,
-          message: "Water Credit Not Found",
+          message: "Kredit Air tidak ditemukan",
         });
       }
 
       return res.status(200).json({
         status: 200,
         data: waterCredit,
-        message: "Water Credit Found",
+        message: "Kredit Air ditemukan",
       });
     } catch (err) {
       return res.status(500).json({
         status: 500,
-        message: "Internal Server Error",
+        message: "Kesalahan Server Internal",
       });
     }
   },

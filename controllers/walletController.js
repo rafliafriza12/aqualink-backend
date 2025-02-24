@@ -9,7 +9,7 @@ export const getWalletByUserId = [
       if (!userId) {
         return res.status(400).json({
           status: 400,
-          message: "User ID is required, but not provide",
+          message: "ID Pengguna diperlukan, tetapi tidak disediakan",
         });
       }
 
@@ -18,19 +18,19 @@ export const getWalletByUserId = [
       if (!wallet) {
         return res.status(404).json({
           status: 404,
-          message: "Wallet not found",
+          message: "Dompet tidak ditemukan",
         });
       }
 
       return res.status(200).json({
         status: 200,
         data: wallet,
-        message: "Wallet founded",
+        message: "Dompet ditemukan",
       });
     } catch (error) {
       return res.status(500).json({
         status: 500,
-        message: "Internal server error",
+        message: "Kesalahan server internal",
       });
     }
   },

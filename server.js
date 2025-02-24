@@ -11,6 +11,8 @@ import paymentRouter from "./routes/paymentRouter.js";
 import waterCreditRouter from "./routes/waterCreditRoutes.js";
 import subscribeRouter from "./routes/subscribeRouter.js";
 import walletRouter from "./routes/walletRouter.js";
+import notificationRouter from "./routes/notificationRoutes.js";
+import historyRouter from "./routes/historyRoutes.js";
 const app = express();
 const port = 5000;
 
@@ -46,7 +48,8 @@ app.use("/midtrans", paymentRouter);
 app.use("/waterCredit", waterCreditRouter);
 app.use("/subscribe", subscribeRouter);
 app.use("/wallet", walletRouter);
-
+app.use("/notification", notificationRouter);
+app.use("/history", historyRouter);
 connectDB()
   .then(() => {
     app.listen(port, () => {

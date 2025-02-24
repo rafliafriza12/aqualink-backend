@@ -3,6 +3,7 @@ import TransactionMidtrans from "../models/MidTrans.js";
 import snap from "../middleware/midtrans.js";
 import { v4 as uuidv4 } from "uuid";
 import Wallet from "../models/Wallet.js";
+import Notification from "../models/Notification.js";
 
 export const createPayment = [
   verifyToken,
@@ -17,7 +18,7 @@ export const createPayment = [
       if (!id) {
         return res.status(400).json({
           status: 400,
-          message: "User ID is required, but not provided",
+          message: "ID Pengguna diperlukan, tetapi tidak disediakan",
         });
       }
 
@@ -84,9 +85,20 @@ export const createPayment = [
         }
       );
 
+      // Create a notification for payment creation
+      const paymentNotification = new Notification({
+        userId: id,
+        title: "Pembayaran Dibuat",
+        message: `Pembayaran sebesar Rp${amount} telah dibuat. Silakan selesaikan pembayaran.`,
+        category: "TRANSAKSI",
+        link: transaction.redirect_url,
+      });
+
+      await paymentNotification.save();
+
       // Kirim respons Snap redirect URL
       res.status(201).json({
-        message: "Transaction created successfully",
+        message: "Transaksi berhasil dibuat",
         redirectUrl: transaction.redirect_url, // URL untuk melakukan pembayaran
         snapToken: transaction.token,
       });
@@ -100,28 +112,34 @@ export const createPayment = [
 export const webhookMidtrans = async (req, res) => {
   try {
     const notification = req.body;
-    const orderId = notification.order_id;
+    const orderId = notification.transaction_id;
     const transactionStatus = notification.transaction_status;
 
     // Mencari transaksi berdasarkan orderId
     const transaction = await TransactionMidtrans.findOne({ orderId });
 
     if (!transaction) {
-      return res.status(404).json({ message: "Transaction not found" });
+      return res.status(404).json({ message: "Transaksi tidak ditemukan" });
     }
 
     const userId = transaction.customerDetails.userId;
     const wallet = await Wallet.findOne({ userId });
 
     if (!wallet) {
-      return res.status(404).json({ message: "Wallet not found" });
+      return res.status(404).json({ message: "Dompet tidak ditemukan" });
     }
+
+    let notificationMessage = "";
+    let notificationTitle = "";
+
     // Menangani pembayaran yang berhasil
     if (transactionStatus === "expire") {
       await Wallet.findOneAndUpdate(
         { userId },
         { $set: { pendingBalance: wallet.pendingBalance - transaction.amount } }
       );
+      notificationTitle = "Pembayaran Kadaluarsa";
+      notificationMessage = `Pembayaran sebesar Rp${transaction.amount} telah kadaluarsa. Silakan coba lagi.`;
     }
 
     if (transactionStatus === "success") {
@@ -135,19 +153,29 @@ export const webhookMidtrans = async (req, res) => {
           $set: { pendingBalance: wallet.pendingBalance - transaction.amount }, // Menghapus saldo pending setelah top-up
         }
       );
+      notificationTitle = "Pembayaran Berhasil";
+      notificationMessage = `Pembayaran sebesar Rp${transaction.amount} berhasil. Saldo Anda telah diperbarui.`;
     }
 
     // Update status transaksi di collection TransactionMidtrans
     transaction.transactionStatus = transactionStatus;
     await transaction.save();
 
+    // Create a notification for transaction status update
+    const statusNotification = new Notification({
+      userId,
+      title: notificationTitle,
+      message: notificationMessage,
+      category: "TRANSAKSI",
+    });
+
+    await statusNotification.save();
+
     // Kirim respon OK untuk Midtrans
-    res
-      .status(200)
-      .json({ message: "Transaction status updated successfully" });
+    res.status(200).json({ message: "Status transaksi berhasil diperbarui" });
   } catch (error) {
     console.error("Error processing notification:", error);
-    res.status(500).json({ message: "Failed to update transaction status" });
+    res.status(500).json({ message: "Gagal memperbarui status transaksi" });
   }
 };
 
@@ -163,17 +191,17 @@ export const getTransactionByOrderID = [
       });
 
       if (!transaction) {
-        return res.status(404).json({ message: "Transaction not found" });
+        return res.status(404).json({ message: "Transaksi tidak ditemukan" });
       }
 
       res.status(200).json({
-        message: "Transaction found",
+        message: "Transaksi ditemukan",
         data: transaction,
         status: transaction.transactionStatus,
       });
     } catch (error) {
       console.error("Error fetching transaction status:", error);
-      res.status(500).json({ message: "Failed to fetch transaction status" });
+      res.status(500).json({ message: "Gagal mengambil status transaksi" });
     }
   },
 ];
