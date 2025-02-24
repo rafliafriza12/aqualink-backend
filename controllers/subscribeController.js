@@ -572,7 +572,7 @@ export const unsubscribe = [
       }
 
       // Update the subscription status to inactive or remove it
-      subscription.subscribeStatus = "inactive"; // or use subscription.remove() to delete
+      subscription.subscribeStatus = false; // or use subscription.remove() to delete
       await subscription.save();
 
       // Optionally, update the totalUser count in WaterCredits
