@@ -101,7 +101,7 @@ export const getHistories = async (req, res) => {
       "Desember",
     ];
 
-    const mappedHistories = histories.map((item) => {
+    let mappedHistories = histories.map((item) => {
       if (filter === "minggu") {
         return { ...item, _id: { day: days[item._id.day - 1] } };
       }
@@ -113,6 +113,23 @@ export const getHistories = async (req, res) => {
       }
       return item;
     });
+
+    // Lengkapi data minggu jika filter adalah minggu
+    if (filter === "minggu") {
+      const existingDays = mappedHistories.map((item) => item._id.day);
+      days.forEach((day, index) => {
+        if (!existingDays.includes(day)) {
+          mappedHistories.push({
+            _id: { day },
+            totalUsedWater: 0,
+          });
+        }
+      });
+      // Urutkan berdasarkan urutan hari dalam seminggu
+      mappedHistories.sort(
+        (a, b) => days.indexOf(a._id.day) - days.indexOf(b._id.day)
+      );
+    }
 
     // Cek total penggunaan air hari ini
     const today = new Date();
