@@ -18,8 +18,10 @@ export const getNotificationsByUserId = async (req, res) => {
         .json({ status: 400, message: "Format ID Pengguna tidak valid" });
     }
 
-    // Check if notifications exist for this user
-    const notifications = await Notification.find({ userId });
+    // Check if notifications exist for this user, sorted by newest first
+    const notifications = await Notification.find({ userId }).sort({
+      createdAt: -1,
+    });
     if (notifications.length === 0) {
       return res.status(404).json({
         status: 404,
