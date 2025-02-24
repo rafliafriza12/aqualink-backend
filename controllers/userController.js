@@ -3,6 +3,7 @@ import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Wallet from "../models/Wallet.js";
 import { verifyToken } from "../middleware/auth.js";
+import Notification from "../models/Notification.js";
 
 export const registerUser = async (req, res, next) => {
   try {
@@ -178,12 +179,10 @@ export const loginUser = async (req, res, next) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({
-          status: 400,
-          message: "Silakan isi semua kolom yang diperlukan.",
-        });
+      return res.status(400).json({
+        status: 400,
+        message: "Silakan isi semua kolom yang diperlukan.",
+      });
     } else {
       const user = await usersModel.findOne({ email });
       if (!user) {
@@ -209,6 +208,17 @@ export const loginUser = async (req, res, next) => {
             }
             user.set("token", token);
             user.save();
+
+            // Create a notification for successful login
+            const loginNotification = new Notification({
+              userId: user._id,
+              title: "Login Berhasil",
+              message: "Anda telah berhasil masuk ke akun Anda.",
+              category: "INFORMASI",
+            });
+
+            loginNotification.save();
+
             return res.status(200).json({
               status: 200,
               data: user,
@@ -219,7 +229,11 @@ export const loginUser = async (req, res, next) => {
       }
     }
   } catch (error) {
-    console.log(error);
+    console.log("Error during login:", error);
+    res.status(500).json({
+      status: 500,
+      message: "Kesalahan server internal",
+    });
   }
 };
 
@@ -244,11 +258,21 @@ export const logoutUser = async (req, res) => {
     user.set("token", null);
     await user.save();
 
+    // Create a notification for logout
+    const logoutNotification = new Notification({
+      userId,
+      title: "Logout Berhasil",
+      message: "Anda telah berhasil keluar dari akun Anda.",
+      category: "INFORMASI",
+    });
+
+    await logoutNotification.save();
+
     return res
       .status(200)
       .json({ status: 200, message: "Pengguna berhasil keluar." });
   } catch (error) {
-    console.error(error);
+    console.error("Error during logout:", error);
     res
       .status(500)
       .json({ status: 500, message: "Terjadi kesalahan saat keluar." });
