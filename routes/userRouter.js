@@ -5,17 +5,14 @@ import {
   logoutUser,
   changePassword,
   editProfile,
-  login,
-  logout,
 } from "../controllers/userController.js";
-import { verifyToken } from "../middleware/auth.js";
 
 const userRouter = express.Router();
 
 userRouter.post("/", registerUser);
 userRouter.put("/changePassword/:id", changePassword);
 userRouter.put("/editProfile/:id", editProfile);
-userRouter.post("/login", login);
-userRouter.post("/logout", verifyToken, logout);
+userRouter.post("/login", loginUser);
+userRouter.post("/logout", logoutUser);
 
 export default userRouter;

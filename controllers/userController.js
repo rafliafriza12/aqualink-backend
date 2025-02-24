@@ -2,6 +2,7 @@ import usersModel from "../models/User.js";
 import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
 import Wallet from "../models/Wallet.js";
+import Notification from "../models/Notification.js";
 import { verifyToken } from "../middleware/auth.js";
 
 export const registerUser = async (req, res, next) => {
@@ -91,6 +92,17 @@ export const changePassword = [
         user.set("password", hash);
         await user.save();
 
+        // Create notification for password change
+        const passwordNotification = new Notification({
+          userId: id,
+          title: "Kata Sandi Diubah",
+          message: "Kata sandi akun Anda telah berhasil diubah.",
+          category: "INFORMASI",
+          link: `/profile/${id}`,
+        });
+
+        await passwordNotification.save();
+
         return res
           .status(200)
           .json({ data: user, message: "Kata sandi berhasil diubah." });
@@ -160,6 +172,17 @@ export const editProfile = [
 
       await user.save();
 
+      // Create notification for profile update
+      const profileNotification = new Notification({
+        userId: id,
+        title: "Profil Diperbarui",
+        message: "Profil akun Anda telah berhasil diperbarui.",
+        category: "INFORMASI",
+        link: `/profile/${id}`,
+      });
+
+      await profileNotification.save();
+
       return res.status(200).json({
         status: 200,
         data: user,
@@ -201,29 +224,49 @@ export const loginUser = async (req, res, next) => {
           };
           const JWT_SECRET = process.env.JWT_SECRET;
 
-          jwt.sign(payload, JWT_SECRET, { expiresIn: "1h" }, (err, token) => {
-            if (err) {
-              return res.status(500).json(err);
+          jwt.sign(
+            payload,
+            JWT_SECRET,
+            { expiresIn: "1h" },
+            async (err, token) => {
+              if (err) {
+                return res.status(500).json(err);
+              }
+              user.set("token", token);
+              await user.save();
+
+              // Create a notification for successful login
+              const loginNotification = new Notification({
+                userId: user._id,
+                title: "Login Berhasil",
+                message: "Anda telah berhasil masuk ke akun Anda.",
+                category: "INFORMASI",
+              });
+
+              await loginNotification.save();
+
+              return res.status(200).json({
+                status: 200,
+                data: user,
+                token: user.token,
+              });
             }
-            user.set("token", token);
-            user.save();
-            return res.status(200).json({
-              status: 200,
-              data: user,
-              token: user.token,
-            });
-          });
+          );
         }
       }
     }
   } catch (error) {
-    console.log(error);
+    console.log("Error during login:", error);
+    res.status(500).json({
+      status: 500,
+      message: "Kesalahan server internal",
+    });
   }
 };
 
 export const logoutUser = async (req, res) => {
   try {
-    const { userId } = req.body; // Anggap bahwa userId dikirim dari client saat logout
+    const { userId } = req.body; // Assuming userId is sent from the client during logout
 
     if (!userId) {
       return res
@@ -238,15 +281,25 @@ export const logoutUser = async (req, res) => {
         .json({ status: 404, message: "Pengguna tidak ditemukan." });
     }
 
-    // Hapus atau atur token menjadi null
+    // Remove or set token to null
     user.set("token", null);
     await user.save();
+
+    // Create a notification for logout
+    const logoutNotification = new Notification({
+      userId,
+      title: "Logout Berhasil",
+      message: "Anda telah berhasil keluar dari akun Anda.",
+      category: "INFORMASI",
+    });
+
+    await logoutNotification.save();
 
     return res
       .status(200)
       .json({ status: 200, message: "Pengguna berhasil keluar." });
   } catch (error) {
-    console.error(error);
+    console.error("Error during logout:", error);
     res
       .status(500)
       .json({ status: 500, message: "Terjadi kesalahan saat keluar." });
