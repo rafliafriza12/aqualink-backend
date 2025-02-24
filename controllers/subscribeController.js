@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import WaterCredits from "../models/WaterCredits.js";
 import { verifyToken } from "../middleware/auth.js";
 import Notification from "../models/Notification.js";
+import HistoryUsage from "../models/HistoryUsage.js";
 
 export const createSubscribe = [
   verifyToken,
