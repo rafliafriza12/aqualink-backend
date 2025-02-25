@@ -39,6 +39,40 @@ export const createSubscribe = [
         });
       }
 
+      // Check if subscription already exists
+      const existingSubscription = await Subscribe.findOne({
+        "customerDetail.id": customerDetail.id,
+        waterCreditId: waterCreditId,
+      });
+
+      if (existingSubscription) {
+        if (!existingSubscription.subscribeStatus) {
+          existingSubscription.subscribeStatus = true;
+          await existingSubscription.save();
+
+          const subscribeNotification = new Notification({
+            userId: customerDetail.id,
+            title: "Langganan Diaktifkan Kembali",
+            message:
+              "Anda telah berhasil mengaktifkan kembali langganan layanan air.",
+            category: "INFORMASI",
+          });
+
+          await subscribeNotification.save();
+
+          return res.status(200).json({
+            status: 200,
+            data: existingSubscription,
+            message: "Berhasil mengaktifkan kembali langganan",
+          });
+        }
+
+        return res.status(400).json({
+          status: 400,
+          message: "Anda sudah berlangganan layanan air ini",
+        });
+      }
+
       const updatedWaterCredit = await WaterCredits.findByIdAndUpdate(
         waterCreditId,
         { $inc: { totalUser: 1 } },
