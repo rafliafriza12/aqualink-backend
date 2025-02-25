@@ -160,6 +160,7 @@ export const getSubscribeByUserId = [
               isPipeClose: "$isPipeClose",
               createdAt: "$createdAt",
               updatedAt: "$updatedAt",
+              _id: "$_id",
             },
             waterCredit: {
               _id: "$waterCredit._id",
