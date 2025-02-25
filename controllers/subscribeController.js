@@ -225,7 +225,11 @@ export const incrementUsedWater = async (req, res) => {
     // Update usage and save history
     subscription.usedWaterInTempo += usedWater - subscription.usedWaterInTempo;
     subscription.totalUsedWater += usedWater - subscription.totalUsedWater;
-    const historyEntry = new HistoryUsage({ userId, waterCreditId, usedWater });
+    const historyEntry = new HistoryUsage({
+      userId,
+      waterCreditId,
+      usedWater: usedWater - subscription.totalUsedWater,
+    });
     await Promise.all([historyEntry.save(), subscription.save()]);
 
     // Return early if no billing is due
