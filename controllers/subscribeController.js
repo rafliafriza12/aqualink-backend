@@ -368,15 +368,33 @@ export const isBalanceZero = async (req, res) => {
         });
       }
 
-      // Create notification for pipe closure
-      const pipeCloseNotification = new Notification({
+      // Check if notification already exists for today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const existingNotification = await Notification.findOne({
         userId,
         title: "Pipa Ditutup",
-        message: "Pipa air Anda telah ditutup karena saldo nol.",
         category: "INFORMASI",
+        createdAt: {
+          $gte: today,
+          $lt: tomorrow,
+        },
       });
 
-      await pipeCloseNotification.save();
+      // Create notification only if none exists for today
+      if (!existingNotification) {
+        const pipeCloseNotification = new Notification({
+          userId,
+          title: "Pipa Ditutup",
+          message: "Pipa air Anda telah ditutup karena saldo nol.",
+          category: "INFORMASI",
+        });
+
+        await pipeCloseNotification.save();
+      }
 
       return res.status(200).json({
         status: 200,
