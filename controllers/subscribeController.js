@@ -224,8 +224,9 @@ export const incrementUsedWater = async (req, res) => {
 
     // Update usage and save history
     const actualUsedWater = usedWater - subscription.totalUsedWater;
-    subscription.usedWaterInTempo = usedWater;
     subscription.totalUsedWater = usedWater;
+    subscription.usedWaterInTempo += actualUsedWater; // Increment tempo usage
+
     const historyEntry = new HistoryUsage({
       userId,
       waterCreditId,
@@ -246,42 +247,139 @@ export const incrementUsedWater = async (req, res) => {
       });
     }
 
-    // Process payment
+    // Process payment when billing is due
     const costPerLiter = waterCredit.cost / waterCredit.perLiter;
     const totalCost = subscription.usedWaterInTempo * costPerLiter;
-    const paidWater =
-      wallet.balance < totalCost
-        ? Math.floor(wallet.balance / costPerLiter)
-        : subscription.usedWaterInTempo;
-    const actualPayment = paidWater * costPerLiter;
+
+    if (subscription.usedWaterInTempo === 0) {
+      return res.status(200).json({
+        status: 200,
+        message: "Tidak ada penggunaan air untuk ditagih",
+        data: { subscription, history: historyEntry },
+      });
+    }
 
     const session = await mongoose.startSession();
     try {
       session.startTransaction();
 
       // Update balances
-      subscription.usedWaterInTempo -= paidWater;
-      wallet.balance -= actualPayment;
-      waterCredit.income += actualPayment;
-      waterCredit.totalIncome += actualPayment;
+      if (wallet.balance < totalCost) {
+        // Calculate how many liters can be paid with remaining balance
+        const affordableLiters = Math.floor(wallet.balance / costPerLiter);
+        const affordableCost = affordableLiters * costPerLiter;
+        const remainingLiters =
+          subscription.usedWaterInTempo - affordableLiters;
 
-      // Create notifications
-      const notifications = await Promise.all([
-        new Notification({
+        // Process partial payment
+        if (affordableLiters > 0) {
+          wallet.balance = 0; // Use all remaining balance
+          waterCredit.income += affordableCost;
+          waterCredit.totalIncome += affordableCost;
+          subscription.usedWaterInTempo = remainingLiters;
+
+          await Promise.all([
+            subscription.save({ session }),
+            wallet.save({ session }),
+            waterCredit.save({ session }),
+          ]);
+        }
+
+        // Check if notification already exists for today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        const existingNotification = await Notification.findOne({
           userId,
-          title: "Tagihan Air Jatuh Tempo",
-          message: `Tagihan air Anda untuk periode ${waterCredit.billingTime} telah jatuh tempo. Total tagihan: Rp${totalCost}`,
+          title: "Peringatan Saldo",
+          category: "TRANSAKSI",
+          createdAt: { $gte: today, $lt: tomorrow },
+        });
+
+        if (!existingNotification) {
+          // Create warning notification only if none exists for today
+          const notification = await new Notification({
+            userId,
+            title: "Peringatan Saldo",
+            message: `Tagihan air Anda sebagian telah dibayar untuk ${affordableLiters} liter. Sisa tagihan untuk ${remainingLiters} liter (Rp${
+              remainingLiters * costPerLiter
+            }) tidak dapat diproses karena saldo tidak mencukupi`,
+            category: "TRANSAKSI",
+            link: `/billing/${userId}`,
+          }).save({ session });
+
+          await session.commitTransaction();
+
+          return res.status(200).json({
+            status: 200,
+            message:
+              "Pembayaran sebagian berhasil, saldo tidak mencukupi untuk pembayaran penuh",
+            data: {
+              subscription,
+              wallet,
+              notification,
+              paymentDetails: {
+                paidLiters: affordableLiters,
+                paidAmount: affordableCost,
+                remainingLiters,
+                remainingCost: remainingLiters * costPerLiter,
+                costPerLiter,
+              },
+            },
+          });
+        }
+
+        await session.commitTransaction();
+        return res.status(200).json({
+          status: 200,
+          message:
+            "Pembayaran sebagian berhasil, saldo tidak mencukupi untuk pembayaran penuh",
+          data: {
+            subscription,
+            wallet,
+            paymentDetails: {
+              paidLiters: affordableLiters,
+              paidAmount: affordableCost,
+              remainingLiters,
+              remainingCost: remainingLiters * costPerLiter,
+              costPerLiter,
+            },
+          },
+        });
+      }
+
+      // Process full payment
+      wallet.balance -= totalCost;
+      waterCredit.income += totalCost;
+      waterCredit.totalIncome += totalCost;
+      subscription.usedWaterInTempo = 0; // Reset used water after payment
+
+      // Check if payment notification already exists for today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const existingPaymentNotification = await Notification.findOne({
+        userId,
+        title: "Pembayaran Tagihan Air",
+        category: "TRANSAKSI",
+        createdAt: { $gte: today, $lt: tomorrow },
+      });
+
+      let notification;
+      if (!existingPaymentNotification) {
+        // Create payment notification only if none exists for today
+        notification = await new Notification({
+          userId,
+          title: "Pembayaran Tagihan Air",
+          message: `Tagihan air Anda untuk periode ${waterCredit.billingTime} telah dibayar. Total pembayaran: Rp${totalCost}`,
           category: "TRANSAKSI",
           link: `/billing/${userId}`,
-        }).save({ session }),
-        new Notification({
-          userId,
-          title: "Pemotongan Saldo",
-          message: `Saldo Anda telah dipotong sebesar Rp${actualPayment} untuk pembayaran tagihan air periode ${waterCredit.billingTime}`,
-          category: "TRANSAKSI",
-          link: `/billing/${userId}`,
-        }).save({ session }),
-      ]);
+        }).save({ session });
+      }
 
       // Save all changes
       await Promise.all([
@@ -294,21 +392,14 @@ export const incrementUsedWater = async (req, res) => {
 
       return res.status(200).json({
         status: 200,
-        message:
-          wallet.balance >= totalCost
-            ? "Tagihan berhasil diproses"
-            : "Pembayaran sebagian diproses karena saldo tidak mencukupi",
+        message: "Tagihan berhasil diproses",
         data: {
           subscription,
           wallet,
           waterCredit,
-          notifications: {
-            billing: notifications[0],
-            payment: notifications[1],
-          },
+          ...(notification && { notification }),
           paymentDetails: {
-            paidWater,
-            actualPayment,
+            totalCost,
             costPerLiter,
           },
         },
