@@ -6,6 +6,20 @@ import { verifyToken } from "../middleware/auth.js";
 import Notification from "../models/Notification.js";
 import HistoryUsage from "../models/HistoryUsage.js";
 
+const checkNotificationExists = async (userId, title, category) => {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  return await Notification.findOne({
+    userId,
+    title,
+    category,
+    createdAt: { $gte: today, $lt: tomorrow },
+  });
+};
+
 export const createSubscribe = [
   verifyToken,
   async (req, res) => {
@@ -45,7 +59,6 @@ export const createSubscribe = [
 
       await newSubscribe.save();
 
-      // Create a notification for successful subscription
       const subscribeNotification = new Notification({
         userId: customerDetail.id,
         title: "Langganan Dibuat",
@@ -61,9 +74,10 @@ export const createSubscribe = [
         message: "Berhasil membuat langganan",
       });
     } catch (error) {
+      console.error("Error in createSubscribe:", error);
       return res.status(500).json({
         status: 500,
-        message: "Kesalahan server internal" + error,
+        message: "Kesalahan server internal",
       });
     }
   },
@@ -82,32 +96,27 @@ export const getSubscribeByUserId = [
       }
 
       const subscriptions = await Subscribe.aggregate([
-        // Match subscriptions for specific user
         {
           $match: {
             "customerDetail.id": userId,
           },
         },
-        // Convert waterCreditId to ObjectId if it's stored as string
         {
           $addFields: {
             waterCreditId: { $toObjectId: "$waterCreditId" },
           },
         },
-        // Lookup WaterCredits
         {
           $lookup: {
-            from: "watercredits", // lowercase collection name
+            from: "watercredits",
             localField: "waterCreditId",
             foreignField: "_id",
             as: "waterCredit",
           },
         },
-        // Unwind the waterCredit array
         {
           $unwind: "$waterCredit",
         },
-        // Shape the output data
         {
           $project: {
             subscriptionDetails: {
@@ -157,7 +166,6 @@ export const getSubscribeByUserId = [
       return res.status(500).json({
         status: 500,
         message: "Kesalahan server internal",
-        error: error.message,
       });
     }
   },
@@ -192,7 +200,6 @@ export const incrementUsedWater = async (req, res) => {
     const { userId, waterCreditId } = req.params;
     const { usedWater } = req.body;
 
-    // Validate input
     if (!userId || !waterCreditId || typeof usedWater === "undefined") {
       return res.status(400).json({
         status: 400,
@@ -200,7 +207,6 @@ export const incrementUsedWater = async (req, res) => {
       });
     }
 
-    // Find subscription and water credit in parallel
     const [subscription, waterCredit, wallet] = await Promise.all([
       Subscribe.findOne({
         "customerDetail.id": userId,
@@ -210,7 +216,6 @@ export const incrementUsedWater = async (req, res) => {
       Wallet.findOne({ userId }),
     ]);
 
-    // Validate resources exist
     if (!subscription || !waterCredit || !wallet) {
       return res.status(404).json({
         status: 404,
@@ -222,12 +227,18 @@ export const incrementUsedWater = async (req, res) => {
       });
     }
 
-    // Update usage and save history
+    // Check subscription status first
+    if (!subscription.subscribeStatus) {
+      return res.status(400).json({
+        status: 400,
+        message: "Langganan tidak aktif",
+      });
+    }
+
     const actualUsedWater = usedWater - subscription.totalUsedWater;
     subscription.totalUsedWater = usedWater;
-    subscription.usedWaterInTempo += actualUsedWater; // Increment tempo usage
+    subscription.usedWaterInTempo += actualUsedWater;
 
-    // Only create and save history if actualUsedWater is not 0
     let historyEntry;
     if (actualUsedWater !== 0) {
       historyEntry = new HistoryUsage({
@@ -240,7 +251,6 @@ export const incrementUsedWater = async (req, res) => {
       await subscription.save();
     }
 
-    // Return early if no billing is due
     const isDue = checkBillingDue(
       subscription.updatedAt,
       waterCredit.billingTime
@@ -256,9 +266,22 @@ export const incrementUsedWater = async (req, res) => {
       });
     }
 
-    // Process payment when billing is due
     const costPerLiter = waterCredit.cost / waterCredit.perLiter;
     const totalCost = subscription.usedWaterInTempo * costPerLiter;
+
+    const isTokenRewardDue = checkBillingDue(
+      subscription.updatedAt,
+      waterCredit.conservationToken.tokenRewardTempo
+    );
+
+    let tokenReward = 0;
+    if (
+      isTokenRewardDue &&
+      subscription.usedWaterInTempo < waterCredit.conservationToken.maxWaterUse
+    ) {
+      tokenReward = waterCredit.conservationToken.rewardToken;
+      wallet.conservationToken += tokenReward;
+    }
 
     if (subscription.usedWaterInTempo === 0) {
       return res.status(200).json({
@@ -275,17 +298,14 @@ export const incrementUsedWater = async (req, res) => {
     try {
       session.startTransaction();
 
-      // Update balances
       if (wallet.balance < totalCost) {
-        // Calculate how many liters can be paid with remaining balance
         const affordableLiters = Math.floor(wallet.balance / costPerLiter);
         const affordableCost = affordableLiters * costPerLiter;
         const remainingLiters =
           subscription.usedWaterInTempo - affordableLiters;
 
-        // Process partial payment
         if (affordableLiters > 0) {
-          wallet.balance = 0; // Use all remaining balance
+          wallet.balance = 0;
           waterCredit.income += affordableCost;
           waterCredit.totalIncome += affordableCost;
           subscription.usedWaterInTempo = remainingLiters;
@@ -297,21 +317,13 @@ export const incrementUsedWater = async (req, res) => {
           ]);
         }
 
-        // Check if notification already exists for today
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        const existingNotification = await Notification.findOne({
+        const existingNotification = await checkNotificationExists(
           userId,
-          title: "Peringatan Saldo",
-          category: "TRANSAKSI",
-          createdAt: { $gte: today, $lt: tomorrow },
-        });
+          "Peringatan Saldo",
+          "TRANSAKSI"
+        );
 
         if (!existingNotification) {
-          // Create warning notification only if none exists for today
           const notification = await new Notification({
             userId,
             title: "Peringatan Saldo",
@@ -339,6 +351,7 @@ export const incrementUsedWater = async (req, res) => {
                 remainingLiters,
                 remainingCost: remainingLiters * costPerLiter,
                 costPerLiter,
+                tokenReward,
               },
             },
           });
@@ -359,43 +372,40 @@ export const incrementUsedWater = async (req, res) => {
               remainingLiters,
               remainingCost: remainingLiters * costPerLiter,
               costPerLiter,
+              tokenReward,
             },
           },
         });
       }
 
-      // Process full payment
       wallet.balance -= totalCost;
       waterCredit.income += totalCost;
       waterCredit.totalIncome += totalCost;
-      subscription.usedWaterInTempo = 0; // Reset used water after payment
+      subscription.usedWaterInTempo = 0;
 
-      // Check if payment notification already exists for today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const existingPaymentNotification = await Notification.findOne({
+      const existingPaymentNotification = await checkNotificationExists(
         userId,
-        title: "Pembayaran Tagihan Air",
-        category: "TRANSAKSI",
-        createdAt: { $gte: today, $lt: tomorrow },
-      });
+        "Pembayaran Tagihan Air",
+        "TRANSAKSI"
+      );
 
       let notification;
       if (!existingPaymentNotification) {
-        // Create payment notification only if none exists for today
         notification = await new Notification({
           userId,
           title: "Pembayaran Tagihan Air",
-          message: `Tagihan air Anda untuk periode ${waterCredit.billingTime} telah dibayar. Total pembayaran: Rp${totalCost}`,
+          message: `Tagihan air Anda untuk periode ${
+            waterCredit.billingTime
+          } telah dibayar. Total pembayaran: Rp${totalCost}${
+            tokenReward > 0
+              ? `. Anda mendapatkan reward token sebesar ${tokenReward} karena penggunaan air yang efisien!`
+              : ""
+          }`,
           category: "TRANSAKSI",
           link: `/billing/${userId}`,
         }).save({ session });
       }
 
-      // Save all changes
       await Promise.all([
         subscription.save({ session }),
         wallet.save({ session }),
@@ -416,6 +426,7 @@ export const incrementUsedWater = async (req, res) => {
           paymentDetails: {
             totalCost,
             costPerLiter,
+            tokenReward,
           },
         },
       });
@@ -430,7 +441,6 @@ export const incrementUsedWater = async (req, res) => {
     return res.status(500).json({
       status: 500,
       message: "Kesalahan server internal",
-      error: error.message,
     });
   }
 };
@@ -439,7 +449,7 @@ export const isBalanceZero = async (req, res) => {
   try {
     const { userId, waterCreditId } = req.params;
     let isPipeClose = false;
-    // Validasi input
+
     if (!userId || !waterCreditId) {
       return res.status(400).json({
         status: 400,
@@ -447,7 +457,6 @@ export const isBalanceZero = async (req, res) => {
       });
     }
 
-    // Cari wallet berdasarkan userId (customerId)
     const wallet = await Wallet.findOne({ userId: userId });
 
     if (!wallet) {
@@ -457,10 +466,8 @@ export const isBalanceZero = async (req, res) => {
       });
     }
 
-    // Cek apakah balance 0
     if (wallet.balance === 0) {
       isPipeClose = true;
-      // Update isPipeClose menjadi true pada subscription
       const updatedSubscribe = await Subscribe.findOneAndUpdate(
         { "customerDetail.id": userId, waterCreditId },
         { isPipeClose: true },
@@ -474,23 +481,12 @@ export const isBalanceZero = async (req, res) => {
         });
       }
 
-      // Check if notification already exists for today
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      const existingNotification = await Notification.findOne({
+      const existingNotification = await checkNotificationExists(
         userId,
-        title: "Pipa Ditutup",
-        category: "INFORMASI",
-        createdAt: {
-          $gte: today,
-          $lt: tomorrow,
-        },
-      });
+        "Pipa Ditutup",
+        "INFORMASI"
+      );
 
-      // Create notification only if none exists for today
       if (!existingNotification) {
         const pipeCloseNotification = new Notification({
           userId,
@@ -536,13 +532,11 @@ export const getSubscribeByOwnerId = [
       }
 
       const subscriptions = await Subscribe.aggregate([
-        // Convert string ID to ObjectId if needed
         {
           $addFields: {
             waterCreditId: { $toObjectId: "$waterCreditId" },
           },
         },
-        // Lookup water credits data
         {
           $lookup: {
             from: "watercredits",
@@ -551,17 +545,14 @@ export const getSubscribeByOwnerId = [
             as: "waterCreditInfo",
           },
         },
-        // Unwind the array created by lookup
         {
           $unwind: "$waterCreditInfo",
         },
-        // Filter by owner ID
         {
           $match: {
             "waterCreditInfo.owner.id": id,
           },
         },
-        // Shape the output data
         {
           $project: {
             _id: 1,
@@ -589,7 +580,6 @@ export const getSubscribeByOwnerId = [
             },
           },
         },
-        // Sort by creation date (optional)
         {
           $sort: {
             createdAt: -1,
@@ -617,7 +607,6 @@ export const getSubscribeByOwnerId = [
       return res.status(500).json({
         status: 500,
         message: "Kesalahan server internal",
-        error: err.message,
       });
     }
   },
@@ -669,7 +658,6 @@ export const unsubscribe = [
         });
       }
 
-      // Find the subscription
       const subscription = await Subscribe.findOne({
         "customerDetail.id": userId,
         waterCreditId: waterCreditId,
@@ -682,18 +670,15 @@ export const unsubscribe = [
         });
       }
 
-      // Update the subscription status to inactive or remove it
-      subscription.subscribeStatus = false; // or use subscription.remove() to delete
+      subscription.subscribeStatus = false;
       await subscription.save();
 
-      // Optionally, update the totalUser count in WaterCredits
       await WaterCredits.findByIdAndUpdate(
         waterCreditId,
         { $inc: { totalUser: -1 } },
         { new: true, upsert: false }
       );
 
-      // Optionally, create a notification for the user
       const unsubscribeNotification = new Notification({
         userId,
         title: "Berhenti Berlangganan",
@@ -713,7 +698,6 @@ export const unsubscribe = [
       return res.status(500).json({
         status: 500,
         message: "Kesalahan server internal",
-        error: error.message,
       });
     }
   },
