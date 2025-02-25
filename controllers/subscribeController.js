@@ -227,12 +227,18 @@ export const incrementUsedWater = async (req, res) => {
     subscription.totalUsedWater = usedWater;
     subscription.usedWaterInTempo += actualUsedWater; // Increment tempo usage
 
-    const historyEntry = new HistoryUsage({
-      userId,
-      waterCreditId,
-      usedWater: actualUsedWater,
-    });
-    await Promise.all([historyEntry.save(), subscription.save()]);
+    // Only create and save history if actualUsedWater is not 0
+    let historyEntry;
+    if (actualUsedWater !== 0) {
+      historyEntry = new HistoryUsage({
+        userId,
+        waterCreditId,
+        usedWater: actualUsedWater,
+      });
+      await Promise.all([historyEntry.save(), subscription.save()]);
+    } else {
+      await subscription.save();
+    }
 
     // Return early if no billing is due
     const isDue = checkBillingDue(
@@ -243,7 +249,10 @@ export const incrementUsedWater = async (req, res) => {
       return res.status(200).json({
         status: 200,
         message: "Penggunaan air diperbarui, tagihan belum jatuh tempo",
-        data: { subscription, history: historyEntry },
+        data: {
+          subscription,
+          ...(historyEntry && { history: historyEntry }),
+        },
       });
     }
 
@@ -255,7 +264,10 @@ export const incrementUsedWater = async (req, res) => {
       return res.status(200).json({
         status: 200,
         message: "Tidak ada penggunaan air untuk ditagih",
-        data: { subscription, history: historyEntry },
+        data: {
+          subscription,
+          ...(historyEntry && { history: historyEntry }),
+        },
       });
     }
 
@@ -320,6 +332,7 @@ export const incrementUsedWater = async (req, res) => {
               subscription,
               wallet,
               notification,
+              ...(historyEntry && { history: historyEntry }),
               paymentDetails: {
                 paidLiters: affordableLiters,
                 paidAmount: affordableCost,
@@ -339,6 +352,7 @@ export const incrementUsedWater = async (req, res) => {
           data: {
             subscription,
             wallet,
+            ...(historyEntry && { history: historyEntry }),
             paymentDetails: {
               paidLiters: affordableLiters,
               paidAmount: affordableCost,
@@ -398,6 +412,7 @@ export const incrementUsedWater = async (req, res) => {
           wallet,
           waterCredit,
           ...(notification && { notification }),
+          ...(historyEntry && { history: historyEntry }),
           paymentDetails: {
             totalCost,
             costPerLiter,
