@@ -1,8 +1,15 @@
 import express from "express";
-import { getWalletByUserId } from "../controllers/walletController.js";
+import {
+  getWalletByUserId,
+  convertConservasionToken,
+} from "../controllers/walletController.js";
 
 const walletRouter = express.Router();
 
 walletRouter.get("/getWalletByUserId/:userId", getWalletByUserId);
+walletRouter.post(
+  "/convertConservasionToken/:userId",
+  convertConservasionToken
+);
 
 export default walletRouter;
