@@ -95,22 +95,13 @@ export const convertConservasionToken = [
       wallet.balance += convertedAmount;
       wallet.conservationToken -= token;
 
-      const existingNotification = await checkNotificationExists(
+      const notification = new Notification({
         userId,
-        "Konversi Token",
-        "TRANSAKSI"
-      );
-
-      let notification;
-      if (!existingNotification) {
-        notification = new Notification({
-          userId,
-          title: "Konversi Token",
-          message: `Anda telah berhasil mengkonversi ${token} token konservasi menjadi Rp${convertedAmount}`,
-          category: "TRANSAKSI",
-        });
-        await notification.save();
-      }
+        title: "Konversi Token",
+        message: `Anda telah berhasil mengkonversi ${token} token konservasi menjadi Rp${convertedAmount}`,
+        category: "TRANSAKSI",
+      });
+      await notification.save();
 
       await wallet.save();
 
@@ -118,7 +109,7 @@ export const convertConservasionToken = [
         status: 200,
         data: {
           wallet,
-          ...(notification && { notification }),
+          notification,
         },
         message: "Konversi token berhasil",
       });
