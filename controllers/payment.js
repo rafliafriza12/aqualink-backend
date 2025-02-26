@@ -57,6 +57,7 @@ export const createPayment = [
           last_name: customerDetails.lastName,
           email: customerDetails.email,
           phone: customerDetails.phone,
+          userId: customerDetails.userId,
         },
       };
 

@@ -418,6 +418,15 @@ export const incrementUsedWater = async (req, res) => {
       waterCredit.totalIncome += totalCost;
       subscription.usedWaterInTempo = 0;
 
+      // Add balance to the wallet of the water credit owner
+      const waterCreditOwnerWallet = await Wallet.findOne({
+        userId: waterCredit.owner.id,
+      });
+      if (waterCreditOwnerWallet) {
+        waterCreditOwnerWallet.balance += totalCost;
+        await waterCreditOwnerWallet.save({ session });
+      }
+
       const existingPaymentNotification = await checkNotificationExists(
         userId,
         "Pembayaran Tagihan Air",
