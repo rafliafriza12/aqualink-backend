@@ -114,6 +114,7 @@ export const webhookMidtrans = async (req, res) => {
     const notification = req.body;
     const orderId = notification.order_id; // Updated to match req.body structure
     const transactionStatus = notification.transaction_status;
+    const amount = parseFloat(notification.gross_amount); // Parse the gross amount to a number
 
     // Mencari transaksi berdasarkan orderId
     const transaction = await TransactionMidtrans.findOne({ orderId });
@@ -139,31 +140,31 @@ export const webhookMidtrans = async (req, res) => {
           { userId },
           {
             $set: {
-              pendingBalance: wallet.pendingBalance - transaction.amount,
+              pendingBalance: wallet.pendingBalance - amount, // Use parsed amount
             },
           }
         );
         notificationTitle = "Pembayaran Kadaluarsa";
-        notificationMessage = `Pembayaran sebesar Rp${transaction.amount} telah kadaluarsa. Silakan coba lagi.`;
+        notificationMessage = `Pembayaran sebesar Rp${amount} telah kadaluarsa. Silakan coba lagi.`;
         break;
 
       case "settlement": // Updated to handle 'settlement' status
         await Wallet.findOneAndUpdate(
           { userId },
           {
-            $inc: { balance: transaction.amount },
+            $inc: { balance: amount }, // Use parsed amount
             $set: {
-              pendingBalance: wallet.pendingBalance - transaction.amount,
+              pendingBalance: wallet.pendingBalance - amount, // Use parsed amount
             },
           }
         );
         notificationTitle = "Pembayaran Berhasil";
-        notificationMessage = `Pembayaran sebesar Rp${transaction.amount} berhasil. Saldo Anda telah diperbarui.`;
+        notificationMessage = `Pembayaran sebesar Rp${amount} berhasil. Saldo Anda telah diperbarui.`;
         break;
 
       case "cancel": // Added handling for 'cancel' status
         notificationTitle = "Pembayaran Dibatalkan";
-        notificationMessage = `Pembayaran sebesar Rp${transaction.amount} telah dibatalkan.`;
+        notificationMessage = `Pembayaran sebesar Rp${amount} telah dibatalkan.`;
         break;
 
       default:
