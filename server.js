@@ -17,9 +17,10 @@ const app = express();
 const port = 5000;
 
 configDotenv();
-app.use(cors());
+app.use(cors({ origin: "*", optionsSuccessStatus: 200 }));
 app.use(express.urlencoded({ extended: false }));
 app.use(bodyParser.json());
+app.use(express.json());
 
 const clientOptions = {
   serverApi: { version: "1", strict: true, deprecationErrors: true },
