@@ -191,7 +191,9 @@ export const webhookMidtrans = async (req, res) => {
     res.status(200).json({ message: "Status transaksi berhasil diperbarui" });
   } catch (error) {
     console.error("Error processing notification:", error);
-    res.status(500).json({ message: "Gagal memperbarui status transaksi" });
+    res
+      .status(500)
+      .json({ message: "Gagal memperbarui status transaksi", error: error });
   }
 };
 
