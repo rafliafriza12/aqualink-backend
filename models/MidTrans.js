@@ -6,24 +6,9 @@ const transactionSchema = new mongoose.Schema(
     amount: { type: Number, required: true },
     paymentMethod: {
       type: String,
-      required: true,
-      enum: [
-        "bank_transfer",
-        "gopay",
-        "credit_card",
-        "bca_klikbca",
-        "bca_klikpay",
-        "bri_epay",
-        "cimb_clicks",
-        "danamon_online",
-        "qris",
-        "shopeepay",
-        "akulaku",
-        "indomaret",
-        "alfamart",
-      ], // Daftar metode pembayaran yang didukung
+      required: false,
     },
-    paymentType: { type: String, required: true },
+    paymentType: { type: String },
     transactionStatus: {
       type: String,
       required: true,

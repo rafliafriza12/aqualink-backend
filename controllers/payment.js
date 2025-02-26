@@ -111,7 +111,7 @@ export const createPayment = [
 export const webhookMidtrans = async (req, res) => {
   try {
     const notification = req.body;
-    const orderId = notification.transaction_id;
+    const orderId = notification.order_id; // Updated to match req.body structure
     const transactionStatus = notification.transaction_status;
 
     // Mencari transaksi berdasarkan orderId
@@ -146,7 +146,7 @@ export const webhookMidtrans = async (req, res) => {
         notificationMessage = `Pembayaran sebesar Rp${transaction.amount} telah kadaluarsa. Silakan coba lagi.`;
         break;
 
-      case "success":
+      case "settlement": // Updated to handle 'settlement' status
         await Wallet.findOneAndUpdate(
           { userId },
           {
@@ -158,6 +158,11 @@ export const webhookMidtrans = async (req, res) => {
         );
         notificationTitle = "Pembayaran Berhasil";
         notificationMessage = `Pembayaran sebesar Rp${transaction.amount} berhasil. Saldo Anda telah diperbarui.`;
+        break;
+
+      case "cancel": // Added handling for 'cancel' status
+        notificationTitle = "Pembayaran Dibatalkan";
+        notificationMessage = `Pembayaran sebesar Rp${transaction.amount} telah dibatalkan.`;
         break;
 
       default:
