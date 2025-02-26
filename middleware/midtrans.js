@@ -1,7 +1,8 @@
 import Midtrans from "midtrans-client";
-
+import { configDotenv } from "dotenv";
+configDotenv();
 const midtransClient = new Midtrans.Snap({
-  isProduction: process.env.IS_PRODUCTION === "true", // Ubah ke true jika di production
+  isProduction: true,
   serverKey: process.env.MIDTRANS_SERVER_KEY,
   clientKey: process.env.MIDTRANS_CLIENT_KEY,
 });
