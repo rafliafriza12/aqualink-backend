@@ -227,7 +227,7 @@ export const loginUser = async (req, res, next) => {
           jwt.sign(
             payload,
             JWT_SECRET,
-            { expiresIn: "1h" },
+            { expiresIn: "1d" },
             async (err, token) => {
               if (err) {
                 return res.status(500).json(err);
