@@ -717,11 +717,11 @@ export const unsubscribe = [
       subscription.subscribeStatus = false;
       await subscription.save();
 
-      await WaterCredits.findByIdAndUpdate(
-        waterCreditId,
-        { $inc: { totalUser: -1 } },
-        { new: true, upsert: false }
-      );
+      // await WaterCredits.findByIdAndUpdate(
+      //   waterCreditId,
+      //   { $inc: { totalUser: -1 } },
+      //   { new: true, upsert: false }
+      // );
 
       const unsubscribeNotification = new Notification({
         userId,
