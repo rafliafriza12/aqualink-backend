@@ -13,6 +13,7 @@ import subscribeRouter from "./routes/subscribeRouter.js";
 import walletRouter from "./routes/walletRouter.js";
 import notificationRouter from "./routes/notificationRoutes.js";
 import historyRouter from "./routes/historyRoutes.js";
+import adminAccountRouter from "./routes/adminAccountRoutes.js";
 const app = express();
 const port = 5000;
 
@@ -51,6 +52,7 @@ app.use("/subscribe", subscribeRouter);
 app.use("/wallet", walletRouter);
 app.use("/notification", notificationRouter);
 app.use("/history", historyRouter);
+app.use("/admin/auth", adminAccountRouter);
 connectDB()
   .then(() => {
     app.listen(port, () => {
