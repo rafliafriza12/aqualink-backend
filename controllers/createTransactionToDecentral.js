@@ -6,23 +6,26 @@ const contractAbi = ABI.abi; // Use the abi property from the imported ABI objec
 const provider = new ethers.JsonRpcProvider("http://localhost:8545");
 const signer = provider.getSigner();
 
+const privateKey = process.env.PRIVATE_KEY_LOCAL; // Add your private key to .env file
+const wallet = new ethers.Wallet(privateKey, provider);
+
 // Contract
-const contract = new ethers.Contract(contractAddress, contractAbi, signer);
+const contract = new ethers.Contract(contractAddress, contractAbi, wallet);
 
 // Function to write transaction to blockchain
 async function writeTransactionToBlockchain(userId, receiverId, amount, description) {
     try {
-        // No need to convert userId and receiverId to BigInt as they are now strings
-        // Only convert amount to BigInt
+        // Convert amount to BigInt
         const amountBN = ethers.toBigInt(amount);
 
+        // Ensure userId and receiverId are strings
+        const userIdStr = userId.toString();
+        const receiverIdStr = receiverId.toString();
+
         // Create transaction
-        const transaction = await contract.createTransaction(
-            userId, // Already a string
-            receiverId, // Already a string
-            amountBN,
-            description
-        );
+        const transaction = await contract.createTransaction(userIdStr, receiverIdStr, amountBN, description);
+
+        console.log("Transaction created:", transaction);
 
         // Wait for transaction to be mined
         const receipt = await transaction.wait();
@@ -51,12 +54,10 @@ export async function createBlockchainTransaction(userId, receiverId, amount, de
             throw new Error("Missing required parameters");
         }
 
-        // Ensure userId and receiverId are strings
-        const userIdStr = userId.toString();
-        const receiverIdStr = receiverId.toString();
+        // console.log("createBlockchainTransaction called with:", userId, receiverId, amount, description);
 
         // Write to blockchain
-        const result = await writeTransactionToBlockchain(userIdStr, receiverIdStr, amount, description);
+        const result = await writeTransactionToBlockchain(userId, receiverId, amount, description);
 
         if (!result.success) {
             throw new Error(`Blockchain transaction failed: ${result.error}`);
@@ -70,32 +71,57 @@ export async function createBlockchainTransaction(userId, receiverId, amount, de
 }
 
 // Function to get transactions by user ID from blockchain
-export async function getDataFromBlockchainByUserId(userId) {
+export async function getTransactionById(userId) {
     try {
-        // Ensure userId is a string
         const userIdStr = userId.toString();
-
-        // Call the smart contract method
         const transactions = await contract.getTransactionsByUser(userIdStr);
 
-        // Format the response
-        const formattedTransactions = transactions.map((tx) => ({
-            userId: tx.userId,
-            receiverId: tx.receiverId,
-            amount: Number(tx.amount), // Convert BigInt to number
-            description: tx.description,
-            timestamp: Number(tx.timestamp), // Convert BigInt to number
-        }));
+        if (!transactions || transactions.length === 0) {
+            return {
+                success: true,
+                data: [],
+                message: "No transactions found for this user",
+            };
+        }
 
-        return {
-            success: true,
-            data: formattedTransactions,
-        };
+        try {
+            const formattedTransactions = [];
+            for (let i = 0; i < transactions.length; i++) {
+                const tx = transactions[i];
+                console.log("Raw transaction data:", tx);
+
+                // Get each field from the array indices
+                const userId = tx[0].toString();
+                const receiverId = tx[1].toString();
+                const amount = tx[2].toString();
+                const description = tx[3];
+                const timestamp = parseInt(tx[4].toString());
+
+                formattedTransactions.push({
+                    userId,
+                    receiverId,
+                    amount,
+                    description,
+                    timestamp,
+                });
+            }
+
+            return {
+                success: true,
+                data: formattedTransactions,
+            };
+        } catch (mappingError) {
+            return {
+                success: false,
+                error: `Error formatting transaction data: ${mappingError.message}`,
+                data: [],
+            };
+        }
     } catch (error) {
-        console.error("Error fetching blockchain data:", error);
         return {
             success: false,
             error: error.message,
+            data: [],
         };
     }
 }

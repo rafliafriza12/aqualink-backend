@@ -7,7 +7,7 @@ import Notification from "../models/Notification.js";
 import HistoryUsage from "../models/HistoryUsage.js";
 import Transaction from "../models/Transaction.js";
 import User from "../models/User.js";
-import { createBlockchainTransaction, getDataFromBlockchainByUserId } from "./createTransactionToDecentral.js";
+import { createBlockchainTransaction, getTransactionById } from "./createTransactionToDecentral.js";
 
 const checkNotificationExists = async (userId, title, category) => {
     const today = new Date();
@@ -464,8 +464,6 @@ export const incrementUsedWater = async (req, res) => {
                 totalCost,
                 `Partial water usage payment for ${waterCredit.billingTime}`
             );
-            transaction.blockchainTxHash = blockchainResult.transactionHash;
-            await transaction.save({ session });
 
             await Promise.all([
                 subscription.save({ session }),
@@ -489,6 +487,7 @@ export const incrementUsedWater = async (req, res) => {
                         costPerLiter,
                         tokenReward,
                     },
+                    blockchainResult,
                 },
             });
         } catch (error) {
@@ -702,6 +701,61 @@ export const getSubscribeById = async (req, res) => {
     }
 };
 
+export const createTransactionToBlockchain = async (req, res) => {
+    try {
+        const { userId, receiverId, amount, description } = req.body;
+        console.log("Request body: ", userId, receiverId, amount, description);
+
+        // Validate required fields
+        if (!userId || !receiverId || !amount) {
+            return res.status(400).json({
+                status: 400,
+                message: "User ID, Receiver ID, and Amount are required",
+            });
+        }
+
+        // Verify if user exists
+        const [sender, receiver] = await Promise.all([User.findById(userId), User.findById(receiverId)]);
+
+        if (!sender || !receiver) {
+            return res.status(400).json({
+                status: 400,
+                message: !sender ? "Sender not found" : "Receiver not found",
+            });
+        }
+
+        // Create blockchain transaction
+        const blockchainResult = await createBlockchainTransaction(
+            userId,
+            receiverId,
+            amount,
+            description || "Water Usage Payment"
+        );
+
+        console.log("Blockchain : ", blockchainResult);
+
+        if (!blockchainResult.success) {
+            return res.status(400).json({
+                status: 400,
+                message: "Failed to create blockchain transaction",
+                error: blockchainResult.error,
+            });
+        }
+
+        return res.status(201).json({
+            status: 201,
+            message: "Successfully created blockchain transaction",
+            data: blockchainResult,
+        });
+    } catch (error) {
+        console.error("Error in createTransactionToBlockchain:", error);
+        return res.status(500).json({
+            status: 500,
+            message: "Internal server error",
+        });
+    }
+};
+
 export const getTransactionFromBlockchainByUserId = async (req, res) => {
     try {
         const { userId } = req.params;
@@ -723,7 +777,7 @@ export const getTransactionFromBlockchainByUserId = async (req, res) => {
         }
 
         // Get blockchain data using the imported functi
-        const blockchainData = await getDataFromBlockchainByUserId(userId);
+        const blockchainData = await getTransactionById(userId);
 
         if (!blockchainData.success) {
             return res.status(400).json({
