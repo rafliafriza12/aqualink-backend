@@ -5,6 +5,8 @@ import WaterCredits from "../models/WaterCredits.js";
 import { verifyToken } from "../middleware/auth.js";
 import Notification from "../models/Notification.js";
 import HistoryUsage from "../models/HistoryUsage.js";
+import Transaction from "../models/Transaction.js";
+import User from "../models/User.js";
 
 const checkNotificationExists = async (userId, title, category) => {
   const today = new Date();
@@ -242,23 +244,26 @@ export const incrementUsedWater = async (req, res) => {
       });
     }
 
-    const [subscription, waterCredit, wallet] = await Promise.all([
+    const [subscription, waterCredit, wallet, user] = await Promise.all([
       Subscribe.findOne({
         "customerDetail.id": userId,
         waterCreditId: waterCreditId,
       }),
       WaterCredits.findById(waterCreditId),
       Wallet.findOne({ userId }),
+      User.findById(userId), // Fetch user data
     ]);
 
-    if (!subscription || !waterCredit || !wallet) {
+    if (!subscription || !waterCredit || !wallet || !user) {
       return res.status(404).json({
         status: 404,
         message: !subscription
           ? "Langganan tidak ditemukan"
           : !waterCredit
           ? "Kredit air tidak ditemukan"
-          : "Dompet tidak ditemukan",
+          : !wallet
+          ? "Dompet tidak ditemukan"
+          : "Pengguna tidak ditemukan",
       });
     }
 
@@ -371,6 +376,16 @@ export const incrementUsedWater = async (req, res) => {
 
           await session.commitTransaction();
 
+          // Create transaction record for partial payment
+          const transaction = new Transaction({
+            name: user.fullName, // Use user's full name
+            userID: userId,
+            recieverID: waterCredit.owner.id,
+            amount: affordableCost,
+            category: "TRANSAKSI",
+          });
+          await transaction.save({ session });
+
           return res.status(200).json({
             status: 200,
             message:
@@ -449,6 +464,16 @@ export const incrementUsedWater = async (req, res) => {
           link: `/billing/${userId}`,
         }).save({ session });
       }
+
+      // Create transaction record for full payment
+      const transaction = new Transaction({
+        name: user.fullName, // Use user's full name
+        userID: userId,
+        recieverID: waterCredit.owner.id,
+        amount: totalCost,
+        category: "TRANSAKSI",
+      });
+      await transaction.save({ session });
 
       await Promise.all([
         subscription.save({ session }),
