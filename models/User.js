@@ -10,19 +10,18 @@ const Users = new mongoose.Schema(
     fullName: {
       type: String,
       required: true,
-      unique: true,
     },
     phone: {
       type: String,
-      required: true,
-      unique: true,
+      default: null,
     },
     password: {
       type: String,
-      required: true,
+      default: null,
     },
     token: {
       type: String,
+      default: null,
     },
   },
   { timestamps: true }

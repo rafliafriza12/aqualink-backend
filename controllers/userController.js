@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import Wallet from "../models/Wallet.js";
 import Notification from "../models/Notification.js";
 import { verifyToken } from "../middleware/auth.js";
+import mongoose from "mongoose";
 
 export const registerUser = async (req, res, next) => {
   try {
@@ -317,6 +318,87 @@ export const loginByGoogle = async (req, res) => {
       status: 500,
       message: "Kesalahan server internal",
     });
+  }
+};
+
+export const registerByGoogle = async (req, res) => {
+  const session = await mongoose.startSession();
+  try {
+    const { email, fullName } = req.body;
+
+    if (!email || !fullName) {
+      return res.status(200).json({
+        status: 200,
+        data: {
+          status: "MISSING_FIELD",
+        },
+        message: "Kesalahan Dari Google",
+      });
+    }
+
+    const existingUser = await usersModel.findOne({ email }).lean();
+
+    if (existingUser) {
+      return res.status(200).json({
+        status: 200,
+        data: {
+          status: "ALREADY_REGISTERED",
+        },
+        message: "Email ini sudah terdaftar di akun lain",
+      });
+    }
+    session.startTransaction();
+    const newUser = await new usersModel({
+      email,
+      fullName: fullName.trim(),
+    }).save({ session });
+
+    const newWallet = new Wallet({
+      userId: newUser._id,
+      balance: 0,
+      pendingBalance: 0,
+      conservationToken: 0,
+    });
+
+    const payload = {
+      userId: newUser._id,
+      email: newUser.email,
+    };
+
+    const JWT_SECRET = process.env.JWT_SECRET;
+
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: "1d" });
+
+    newUser.set("token", token);
+
+    const registerNotification = new Notification({
+      userId: newUser._id,
+      title: "Login Berhasil",
+      message: "Anda telah berhasil masuk ke akun Anda.",
+      category: "INFORMASI",
+    });
+    await Promise.all([
+      newUser.save({ session }),
+      newWallet.save({ session }),
+      registerNotification.save({ session }),
+    ]);
+    await session.commitTransaction();
+
+    return res.status(201).json({
+      status: 201,
+      data: newUser,
+      token: newUser.token,
+      message: "Pendaftaran Berhasil, Sedang Mengarahkan ke Beranda",
+    });
+  } catch (error) {
+    await session.abortTransaction();
+    return res.status(500).json({
+      status: 500,
+      message: "Kesalahan Server",
+      error,
+    });
+  } finally {
+    session.endSession();
   }
 };
 
