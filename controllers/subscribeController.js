@@ -276,16 +276,16 @@ export const incrementUsedWater = async (req, res) => {
       });
     }
 
-    const actualUsedWater = usedWater - subscription.totalUsedWater;
-    subscription.totalUsedWater = usedWater;
-    subscription.usedWaterInTempo += actualUsedWater;
+    // const usedWater = usedWater - subscription.totalUsedWater;
+    subscription.totalUsedWater += usedWater;
+    subscription.usedWaterInTempo += usedWater;
 
     let historyEntry;
-    if (actualUsedWater !== 0) {
+    if (usedWater !== 0) {
       historyEntry = new HistoryUsage({
         userId,
         waterCreditId,
-        usedWater: actualUsedWater,
+        usedWater: usedWater,
       });
       await Promise.all([historyEntry.save(), subscription.save()]);
     } else {

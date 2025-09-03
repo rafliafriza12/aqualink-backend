@@ -438,7 +438,10 @@ export const logoutUser = [
 
       return res
         .status(200)
-        .json({ status: 200, message: "Pengguna berhasil keluar." });
+        .json({
+          status: 200,
+          message: "Pengguna berhasil keluar. Sedang mengarahkan keluar",
+        });
     } catch (error) {
       console.error("Error during logout:", error);
       res

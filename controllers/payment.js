@@ -167,6 +167,8 @@ export const webhookMidtrans = async (req, res) => {
         notificationMessage = `Pembayaran sebesar Rp${amount} telah dibatalkan.`;
         break;
 
+      case "pending":
+        break;
       default:
         return res
           .status(400)
