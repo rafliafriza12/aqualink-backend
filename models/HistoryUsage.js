@@ -1,21 +1,27 @@
 import mongoose from "mongoose";
 
-const HistoryUsages = new mongoose.Schema(
+const historyUsageSchema = new mongoose.Schema(
   {
     userId: {
-      type: String,
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Users",
       required: true,
     },
-    waterCreditId: {
-      type: String,
+    meteranId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Meteran",
       required: true,
     },
     usedWater: {
-      type: Number,
+      type: Number, // Liter per detik dari IoT sensor
       required: true,
     },
   },
-  { timestamps: true }
+  {
+    timestamps: true, // Otomatis menambahkan createdAt untuk time-series
+  }
 );
 
-export default mongoose.model("HistoryUsage", HistoryUsages);
+const HistoryUsage = mongoose.model("HistoryUsage", historyUsageSchema);
+
+export default HistoryUsage;

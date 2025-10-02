@@ -23,6 +23,20 @@ const Users = new mongoose.Schema(
       type: String,
       default: null,
     },
+    SambunganDataId: {
+      type: mongoose.Types.ObjectId,
+      ref: "ConnectionData",
+      default: null,
+    },
+    meteranId: {
+      type: mongoose.Types.ObjectId,
+      ref: "Meteran",
+      default: null,
+    },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
   },
   { timestamps: true }
 );

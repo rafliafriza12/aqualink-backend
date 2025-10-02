@@ -436,17 +436,61 @@ export const logoutUser = [
 
       await logoutNotification.save();
 
-      return res
-        .status(200)
-        .json({
-          status: 200,
-          message: "Pengguna berhasil keluar. Sedang mengarahkan keluar",
-        });
+      return res.status(200).json({
+        status: 200,
+        message: "Pengguna berhasil keluar. Sedang mengarahkan keluar",
+      });
     } catch (error) {
       console.error("Error during logout:", error);
       res
         .status(500)
         .json({ status: 500, message: "Terjadi kesalahan saat keluar." });
+    }
+  },
+];
+
+// Get user profile with connection and meter status
+export const getUserProfile = [
+  verifyToken,
+  async (req, res) => {
+    try {
+      const { userId } = req.user;
+
+      const user = await usersModel
+        .findById(userId)
+        .populate("SambunganDataId")
+        .populate({
+          path: "meteranId",
+          populate: {
+            path: "kelompokPelangganId",
+            model: "KelompokPelanggan",
+          },
+        })
+        .select("-password -token");
+
+      if (!user) {
+        return res.status(404).json({
+          status: 404,
+          message: "Pengguna tidak ditemukan",
+        });
+      }
+
+      return res.status(200).json({
+        status: 200,
+        data: {
+          user,
+          hasConnectionData: !!user.SambunganDataId,
+          hasMeteran: !!user.meteranId,
+          isVerified: user.isVerified,
+        },
+        message: "Profil berhasil diambil",
+      });
+    } catch (error) {
+      console.error("Error getting user profile:", error);
+      return res.status(500).json({
+        status: 500,
+        message: "Kesalahan server internal",
+      });
     }
   },
 ];

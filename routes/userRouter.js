@@ -7,6 +7,7 @@ import {
   editProfile,
   loginByGoogle,
   registerByGoogle,
+  getUserProfile,
 } from "../controllers/userController.js";
 
 const userRouter = express.Router();
@@ -18,5 +19,6 @@ userRouter.put("/editProfile/:id", editProfile);
 userRouter.post("/login", loginUser);
 userRouter.post("/login/google", loginByGoogle);
 userRouter.post("/logout", logoutUser);
+userRouter.get("/profile", getUserProfile);
 
 export default userRouter;
