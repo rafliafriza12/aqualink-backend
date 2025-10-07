@@ -31,7 +31,13 @@ export const handlePaymentWebhook = async (req, res) => {
       gross_amount,
       transaction_time,
       status_code,
+      fraud_status,
     });
+
+    console.log(
+      "📨 Full webhook payload:",
+      JSON.stringify(notification, null, 2)
+    );
 
     // Verify signature from Midtrans
     // const serverKey =
@@ -127,6 +133,13 @@ async function handleRABPayment(orderId, transactionStatus, notification) {
       return;
     }
 
+    console.log(`📋 Current RAB status:`, {
+      rabId: rab._id,
+      isPaid: rab.isPaid,
+      totalBiaya: rab.totalBiaya,
+      userId: rab.userId._id,
+    });
+
     let updateData = {};
     let notificationTitle = "";
     let notificationMessage = "";
@@ -184,7 +197,24 @@ async function handleRABPayment(orderId, transactionStatus, notification) {
     }
 
     // Update RAB
-    await RabConnection.findByIdAndUpdate(rabId, updateData);
+    console.log(`🔄 Updating RAB with data:`, updateData);
+    const updatedRab = await RabConnection.findByIdAndUpdate(
+      rabId,
+      updateData,
+      {
+        new: true, // Return updated document
+      }
+    );
+
+    if (updatedRab) {
+      console.log(`✅ RAB updated successfully:`, {
+        rabId: updatedRab._id,
+        isPaid: updatedRab.isPaid,
+        wasUpdated: updatedRab.isPaid !== rab.isPaid,
+      });
+    } else {
+      console.error(`❌ Failed to update RAB: ${rabId}`);
+    }
 
     // Create notification for user
     if (notificationTitle && notificationMessage) {
@@ -195,10 +225,11 @@ async function handleRABPayment(orderId, transactionStatus, notification) {
         category: "PEMBAYARAN",
         link: `/rab/${rabId}`,
       });
+      console.log(`📬 Notification created for user: ${rab.userId._id}`);
     }
 
     console.log(
-      `✅ RAB payment updated: ${rabId} - Status: ${transactionStatus}`
+      `✅ RAB payment webhook processing completed: ${rabId} - Status: ${transactionStatus} - isPaid: ${updatedRab?.isPaid}`
     );
   } catch (error) {
     console.error("❌ Error handling RAB payment:", error);
