@@ -55,6 +55,20 @@ const ConnectionData = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    assignedTechnicianId: {
+      type: mongoose.Types.ObjectId,
+      ref: "Technician",
+      default: null,
+    },
+    assignedAt: {
+      type: Date,
+      default: null,
+    },
+    assignedBy: {
+      type: mongoose.Types.ObjectId,
+      ref: "AdminAccount",
+      default: null,
+    },
     surveiId: {
       type: mongoose.Types.ObjectId,
       ref: "SurveyData",
@@ -63,6 +77,11 @@ const ConnectionData = new mongoose.Schema(
     rabConnectionId: {
       type: mongoose.Types.ObjectId,
       ref: "RabConnection",
+      default: null,
+    },
+    meteranId: {
+      type: mongoose.Types.ObjectId,
+      ref: "Meteran",
       default: null,
     },
     isAllProcedureDone: {

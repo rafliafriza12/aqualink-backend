@@ -11,6 +11,7 @@ import {
 } from "../controllers/technicianController.js";
 import { verifyAdmin } from "../middleware/adminAuth.js";
 import { verifyTechnician } from "../middleware/technicianAuth.js";
+import { verifyAdminOrTechnician } from "../middleware/adminOrTechnicianAuth.js";
 
 const router = express.Router();
 
@@ -21,10 +22,12 @@ router.post("/login", loginTechnician);
 router.get("/profile", verifyTechnician, getTechnicianProfile);
 router.post("/logout", verifyTechnician, logoutTechnician);
 
-// Admin routes
+// Admin & Technician routes (read access)
+router.get("/", verifyAdminOrTechnician, getAllTechnicians);
+router.get("/:id", verifyAdminOrTechnician, getTechnicianById);
+
+// Admin only routes (create/update/delete)
 router.post("/", verifyAdmin, createTechnician);
-router.get("/", verifyAdmin, getAllTechnicians);
-router.get("/:id", verifyAdmin, getTechnicianById);
 router.put("/:id", verifyAdmin, updateTechnician);
 router.delete("/:id", verifyAdmin, deleteTechnician);
 

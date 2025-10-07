@@ -3,12 +3,24 @@ import multer from "multer";
 // Configure multer to use memory storage (store files in memory as Buffer)
 const storage = multer.memoryStorage();
 
-// File filter to only accept PDF files
+// File filter to accept PDF and image files
 const fileFilter = (req, file, cb) => {
-  if (file.mimetype === "application/pdf") {
+  const allowedTypes = [
+    "application/pdf",
+    "image/jpeg",
+    "image/jpg",
+    "image/png",
+  ];
+
+  if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
   } else {
-    cb(new Error("Invalid file type. Only PDF files are allowed."), false);
+    cb(
+      new Error(
+        "Invalid file type. Only PDF and image files (JPEG, PNG) are allowed."
+      ),
+      false
+    );
   }
 };
 

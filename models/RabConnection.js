@@ -12,6 +12,11 @@ const RabConnection = new mongoose.Schema(
       ref: "Users",
       required: true,
     },
+    technicianId: {
+      type: mongoose.Types.ObjectId,
+      ref: "Technician",
+      required: true,
+    },
     totalBiaya: {
       type: Number,
       required: true,
@@ -23,6 +28,10 @@ const RabConnection = new mongoose.Schema(
     rabUrl: {
       type: String,
       required: true,
+    },
+    catatan: {
+      type: String,
+      default: "",
     },
   },
   { timestamps: true }

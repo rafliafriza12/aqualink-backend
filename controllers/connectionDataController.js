@@ -1,6 +1,6 @@
 import ConnectionData from "../models/ConnectionData.js";
 import User from "../models/User.js";
-import { uploadToCloudinary } from "../utils/cloudinary.js";
+import { uploadPdfAsImage } from "../utils/cloudinary.js";
 
 // Create Connection Data (User)
 export const createConnectionData = async (req, res) => {
@@ -8,7 +8,25 @@ export const createConnectionData = async (req, res) => {
     const { nik, noKK, alamat, kecamatan, kelurahan, noImb, luasBangunan } =
       req.body;
 
-    const userId = req.user.id;
+    const userId = req.user.userId;
+    console.log(userId);
+
+    // Check if user exists and has phone number
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        status: 404,
+        message: "User not found",
+      });
+    }
+
+    if (!user.phone) {
+      return res.status(400).json({
+        status: 400,
+        message:
+          "Nomor HP harus diisi terlebih dahulu. Silakan lengkapi profil Anda di menu Edit Profil.",
+      });
+    }
 
     // Check if user already has connection data
     const existingConnection = await ConnectionData.findOne({ userId });
@@ -32,18 +50,21 @@ export const createConnectionData = async (req, res) => {
       });
     }
 
-    // Upload PDF files to Cloudinary
-    const nikUrl = await uploadToCloudinary(
+    // Upload PDF/image files to Cloudinary
+    const nikUrl = await uploadPdfAsImage(
       req.files.nikFile[0].buffer,
-      "aqualink/nik"
+      "aqualink/nik",
+      req.files.nikFile[0].mimetype
     );
-    const kkUrl = await uploadToCloudinary(
+    const kkUrl = await uploadPdfAsImage(
       req.files.kkFile[0].buffer,
-      "aqualink/kk"
+      "aqualink/kk",
+      req.files.kkFile[0].mimetype
     );
-    const imbUrl = await uploadToCloudinary(
+    const imbUrl = await uploadPdfAsImage(
       req.files.imbFile[0].buffer,
-      "aqualink/imb"
+      "aqualink/imb",
+      req.files.imbFile[0].mimetype
     );
 
     const connectionData = new ConnectionData({
@@ -62,6 +83,10 @@ export const createConnectionData = async (req, res) => {
 
     await connectionData.save();
 
+    // Update User's SambunganDataId
+    user.SambunganDataId = connectionData._id;
+    await user.save();
+
     res.status(201).json({
       status: 201,
       message: "Connection data created successfully",
@@ -78,12 +103,13 @@ export const createConnectionData = async (req, res) => {
 // Get Connection Data by User ID
 export const getConnectionDataByUser = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     const connectionData = await ConnectionData.findOne({ userId })
       .populate("userId", "email fullName phone")
       .populate("surveiId")
-      .populate("rabConnectionId");
+      .populate("rabConnectionId")
+      .populate("meteranId");
 
     if (!connectionData) {
       return res.status(404).json({
@@ -107,8 +133,21 @@ export const getConnectionDataByUser = async (req, res) => {
 // Get All Connection Data (Admin)
 export const getAllConnectionData = async (req, res) => {
   try {
-    const { isVerifiedByData, isVerifiedByTechnician, isAllProcedureDone } =
-      req.query;
+    console.log(
+      "[getAllConnectionData] Request from:",
+      req.userRole || "unknown"
+    );
+    console.log(
+      "[getAllConnectionData] User ID:",
+      req.userId || req.technicianId
+    );
+
+    const {
+      isVerifiedByData,
+      isVerifiedByTechnician,
+      isAllProcedureDone,
+      assignedTechnicianId,
+    } = req.query;
 
     let filter = {};
     if (isVerifiedByData !== undefined)
@@ -118,16 +157,37 @@ export const getAllConnectionData = async (req, res) => {
     if (isAllProcedureDone !== undefined)
       filter.isAllProcedureDone = isAllProcedureDone === "true";
 
+    // Filter by assigned technician (untuk teknisi lihat tugas mereka)
+    if (assignedTechnicianId) {
+      filter.assignedTechnicianId = assignedTechnicianId;
+    }
+
+    // Jika request dari teknisi, auto filter hanya tugas yang di-assign ke dia
+    if (req.userRole === "technician" && req.technicianId) {
+      filter.assignedTechnicianId = req.technicianId;
+    }
+
+    console.log("[getAllConnectionData] Filter:", filter);
+
     const connectionData = await ConnectionData.find(filter)
       .populate("userId", "email fullName phone")
+      .populate("assignedTechnicianId", "fullName email phone")
       .populate("surveiId")
-      .populate("rabConnectionId");
+      .populate("rabConnectionId")
+      .populate("meteranId");
+
+    console.log(
+      "[getAllConnectionData] Found",
+      connectionData.length,
+      "records"
+    );
 
     res.status(200).json({
       status: 200,
       data: connectionData,
     });
   } catch (error) {
+    console.error("[getAllConnectionData] Error:", error);
     res.status(500).json({
       status: 500,
       message: error.message,
@@ -138,25 +198,44 @@ export const getAllConnectionData = async (req, res) => {
 // Get Connection Data by ID (Admin/Technician)
 export const getConnectionDataById = async (req, res) => {
   try {
+    console.log(
+      "[getConnectionDataById] Request from:",
+      req.userRole || "unknown"
+    );
+    console.log(
+      "[getConnectionDataById] User ID:",
+      req.userId || req.technicianId
+    );
+
     const { id } = req.params;
+    console.log("[getConnectionDataById] Connection Data ID:", id);
 
     const connectionData = await ConnectionData.findById(id)
       .populate("userId", "email fullName phone")
+      .populate("assignedTechnicianId", "fullName email phone")
       .populate("surveiId")
-      .populate("rabConnectionId");
+      .populate("rabConnectionId")
+      .populate("meteranId");
 
     if (!connectionData) {
+      console.log("[getConnectionDataById] Connection data not found");
       return res.status(404).json({
         status: 404,
         message: "Connection data not found",
       });
     }
 
+    console.log(
+      "[getConnectionDataById] Connection data found:",
+      connectionData._id
+    );
+
     res.status(200).json({
       status: 200,
       data: connectionData,
     });
   } catch (error) {
+    console.error("[getConnectionDataById] Error:", error);
     res.status(500).json({
       status: 500,
       message: error.message,
@@ -286,24 +365,27 @@ export const updateConnectionData = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Handle PDF file uploads if provided
+    // Handle PDF/image file uploads if provided
     if (req.files) {
       if (req.files.nikFile) {
-        updates.nikUrl = await uploadToCloudinary(
+        updates.nikUrl = await uploadPdfAsImage(
           req.files.nikFile[0].buffer,
-          "aqualink/nik"
+          "aqualink/nik",
+          req.files.nikFile[0].mimetype
         );
       }
       if (req.files.kkFile) {
-        updates.kkUrl = await uploadToCloudinary(
+        updates.kkUrl = await uploadPdfAsImage(
           req.files.kkFile[0].buffer,
-          "aqualink/kk"
+          "aqualink/kk",
+          req.files.kkFile[0].mimetype
         );
       }
       if (req.files.imbFile) {
-        updates.imbUrl = await uploadToCloudinary(
+        updates.imbUrl = await uploadPdfAsImage(
           req.files.imbFile[0].buffer,
-          "aqualink/imb"
+          "aqualink/imb",
+          req.files.imbFile[0].mimetype
         );
       }
     }
@@ -337,12 +419,17 @@ export const updateConnectionData = async (req, res) => {
   }
 };
 
-// Delete Connection Data
-export const deleteConnectionData = async (req, res) => {
+// Assign Technician to Connection Data (Admin only)
+export const assignTechnician = async (req, res) => {
   try {
     const { id } = req.params;
+    const { technicianId } = req.body;
 
-    const connectionData = await ConnectionData.findByIdAndDelete(id);
+    console.log("[assignTechnician] Connection Data ID:", id);
+    console.log("[assignTechnician] Technician ID:", technicianId);
+    console.log("[assignTechnician] Admin ID:", req.userId);
+
+    const connectionData = await ConnectionData.findById(id);
 
     if (!connectionData) {
       return res.status(404).json({
@@ -350,6 +437,120 @@ export const deleteConnectionData = async (req, res) => {
         message: "Connection data not found",
       });
     }
+
+    // Check if data is verified by admin first
+    if (!connectionData.isVerifiedByData) {
+      return res.status(400).json({
+        status: 400,
+        message: "Data must be verified by admin before assigning technician",
+      });
+    }
+
+    // Check if already has survey (teknisi sudah mulai kerja)
+    if (connectionData.surveiId) {
+      return res.status(400).json({
+        status: 400,
+        message: "Survey already exists, cannot reassign technician",
+      });
+    }
+
+    // Update assignment
+    connectionData.assignedTechnicianId = technicianId;
+    connectionData.assignedAt = new Date();
+    connectionData.assignedBy = req.userId;
+
+    await connectionData.save();
+
+    // Populate for response
+    await connectionData.populate(
+      "assignedTechnicianId",
+      "fullName email phone"
+    );
+    await connectionData.populate("assignedBy", "email");
+
+    console.log("[assignTechnician] Assignment successful");
+
+    res.status(200).json({
+      status: 200,
+      message: "Technician assigned successfully",
+      data: connectionData,
+    });
+  } catch (error) {
+    console.error("[assignTechnician] Error:", error);
+    res.status(500).json({
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
+// Unassign Technician from Connection Data (Admin only)
+export const unassignTechnician = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    console.log("[unassignTechnician] Connection Data ID:", id);
+
+    const connectionData = await ConnectionData.findById(id);
+
+    if (!connectionData) {
+      return res.status(404).json({
+        status: 404,
+        message: "Connection data not found",
+      });
+    }
+
+    // Check if already has survey
+    if (connectionData.surveiId) {
+      return res.status(400).json({
+        status: 400,
+        message: "Cannot unassign technician after survey is created",
+      });
+    }
+
+    // Remove assignment
+    connectionData.assignedTechnicianId = null;
+    connectionData.assignedAt = null;
+    connectionData.assignedBy = null;
+
+    await connectionData.save();
+
+    console.log("[unassignTechnician] Unassignment successful");
+
+    res.status(200).json({
+      status: 200,
+      message: "Technician unassigned successfully",
+      data: connectionData,
+    });
+  } catch (error) {
+    console.error("[unassignTechnician] Error:", error);
+    res.status(500).json({
+      status: 500,
+      message: error.message,
+    });
+  }
+};
+
+// Delete Connection Data
+export const deleteConnectionData = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const connectionData = await ConnectionData.findById(id);
+
+    if (!connectionData) {
+      return res.status(404).json({
+        status: 404,
+        message: "Connection data not found",
+      });
+    }
+
+    // Remove reference from User
+    await User.findByIdAndUpdate(connectionData.userId, {
+      SambunganDataId: null,
+    });
+
+    await ConnectionData.findByIdAndDelete(id);
 
     res.status(200).json({
       status: 200,

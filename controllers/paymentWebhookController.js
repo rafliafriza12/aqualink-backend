@@ -87,11 +87,19 @@ export const handlePaymentWebhook = async (req, res) => {
 
 /**
  * Handle RAB payment webhook
+ * Order ID format: RAB-{rabId} or RAB-{rabId}-{timestamp}
  */
 async function handleRABPayment(orderId, transactionStatus, notification) {
   try {
-    // Extract RAB ID from order_id (format: RAB-{rabId})
-    const rabId = orderId.replace("RAB-", "");
+    // Extract RAB ID from order_id
+    // Format lama: RAB-{rabId}
+    // Format baru: RAB-{rabId}-{timestamp}
+    const parts = orderId.split("-");
+    const rabId = parts[1]; // Ambil part kedua yang merupakan rabId
+
+    console.log(
+      `🔍 Processing RAB payment for rabId: ${rabId} (order_id: ${orderId})`
+    );
 
     const rab = await RabConnection.findById(rabId).populate("userId");
 

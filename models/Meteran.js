@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const Meteran = new mongoose.Schema(
   {
+    connectionDataId: {
+      type: mongoose.Types.ObjectId,
+      ref: "ConnectionData",
+      default: null,
+    },
     noMeteran: {
       type: String,
       required: true,

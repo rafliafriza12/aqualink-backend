@@ -14,8 +14,8 @@ export const verifyAdmin = async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Cek apakah user adalah admin
-    const admin = await AdminAccount.findById(decoded.id);
+    // Cek apakah user adalah admin (payload menggunakan userId, bukan id)
+    const admin = await AdminAccount.findById(decoded.userId || decoded.id);
     if (!admin) {
       return res.status(403).json({
         status: 403,
@@ -23,7 +23,8 @@ export const verifyAdmin = async (req, res, next) => {
       });
     }
 
-    req.admin = decoded;
+    req.admin = admin;
+    req.userId = admin._id;
     next();
   } catch (error) {
     res.status(403).json({

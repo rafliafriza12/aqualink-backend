@@ -1,7 +1,7 @@
 import usersModel from "../models/User.js";
 import bcryptjs from "bcryptjs";
 import jwt from "jsonwebtoken";
-import Wallet from "../models/Wallet.js";
+// import Wallet from "../models/Wallet.js";
 import Notification from "../models/Notification.js";
 import { verifyToken } from "../middleware/auth.js";
 import mongoose from "mongoose";
@@ -35,15 +35,15 @@ export const registerUser = async (req, res, next) => {
           newUser.set("password", hash);
           await newUser.save(); // Tunggu sampai user disimpan ke DB
 
-          // Setelah user disimpan, buat wallet baru
-          const newWallet = new Wallet({
-            userId: newUser._id, // Menggunakan _id dari user yang baru dibuat
-            balance: 0,
-            pendingBalance: 0,
-            consevationToken: 0,
-          });
+          // // Setelah user disimpan, buat wallet baru
+          // const newWallet = new Wallet({
+          //   userId: newUser._id, // Menggunakan _id dari user yang baru dibuat
+          //   balance: 0,
+          //   pendingBalance: 0,
+          //   consevationToken: 0,
+          // });
 
-          await newWallet.save(); // Tunggu sampai wallet disimpan ke DB
+          // await newWallet.save(); // Tunggu sampai wallet disimpan ke DB
 
           return res
             .status(200)
@@ -122,7 +122,7 @@ export const editProfile = [
   async (req, res) => {
     try {
       const { id } = req.params;
-      const { newFullName, newEmail } = req.body;
+      const { newFullName, newEmail, newPhone } = req.body;
 
       if (!id) {
         return res.status(400).json({
@@ -138,27 +138,7 @@ export const editProfile = [
         });
       }
 
-      const emailAlreadyRegistered = await usersModel.findOne({
-        email: newEmail,
-      });
-      const nameAlreadyRegistered = await usersModel.findOne({
-        fullName: newFullName,
-      });
-
-      if (emailAlreadyRegistered) {
-        return res.status(400).json({
-          status: 400,
-          message: "Email sudah digunakan",
-        });
-      }
-
-      if (nameAlreadyRegistered) {
-        return res.status(400).json({
-          status: 400,
-          message: "Nama sudah digunakan",
-        });
-      }
-
+      // Get current user data first
       const user = await usersModel.findById(id);
 
       if (!user) {
@@ -168,8 +148,43 @@ export const editProfile = [
         });
       }
 
+      // Check if email is being changed and if new email is already used by another user
+      if (newEmail !== user.email) {
+        const emailAlreadyRegistered = await usersModel.findOne({
+          email: newEmail,
+          _id: { $ne: id }, // Exclude current user
+        });
+
+        if (emailAlreadyRegistered) {
+          return res.status(400).json({
+            status: 400,
+            message: "Email sudah digunakan oleh pengguna lain",
+          });
+        }
+      }
+
+      // Check if fullName is being changed and if new name is already used by another user
+      if (newFullName !== user.fullName) {
+        const nameAlreadyRegistered = await usersModel.findOne({
+          fullName: newFullName,
+          _id: { $ne: id }, // Exclude current user
+        });
+
+        if (nameAlreadyRegistered) {
+          return res.status(400).json({
+            status: 400,
+            message: "Nama sudah digunakan oleh pengguna lain",
+          });
+        }
+      }
+
       user.set("fullName", newFullName);
       user.set("email", newEmail);
+
+      // Update phone if provided
+      if (newPhone !== undefined) {
+        user.set("phone", newPhone || null);
+      }
 
       await user.save();
 
@@ -353,12 +368,12 @@ export const registerByGoogle = async (req, res) => {
       fullName: fullName.trim(),
     }).save({ session });
 
-    const newWallet = new Wallet({
-      userId: newUser._id,
-      balance: 0,
-      pendingBalance: 0,
-      conservationToken: 0,
-    });
+    // const newWallet = new Wallet({
+    //   userId: newUser._id,
+    //   balance: 0,
+    //   pendingBalance: 0,
+    //   conservationToken: 0,
+    // });
 
     const payload = {
       userId: newUser._id,
@@ -379,7 +394,7 @@ export const registerByGoogle = async (req, res) => {
     });
     await Promise.all([
       newUser.save({ session }),
-      newWallet.save({ session }),
+      // newWallet.save({ session }), // Commented out because newWallet is not created
       registerNotification.save({ session }),
     ]);
     await session.commitTransaction();

@@ -23,6 +23,7 @@ import technicianRouter from "./routes/technicianRoutes.js";
 import billingRouter from "./routes/billingRoutes.js";
 import monitoringRouter from "./routes/monitoringRoutes.js";
 import webhookRouter from "./routes/webhookRoutes.js";
+import documentRouter from "./routes/documentRoutes.js";
 import {
   setupBillingCron,
   setupOverdueCron,
@@ -79,6 +80,7 @@ app.use("/meteran", meteranRouter);
 app.use("/kelompok-pelanggan", kelompokPelangganRouter);
 app.use("/technician", technicianRouter);
 app.use("/monitoring", monitoringRouter);
+app.use("/documents", documentRouter);
 
 connectDB()
   .then(() => {

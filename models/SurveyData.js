@@ -12,6 +12,11 @@ const SurveyData = new mongoose.Schema(
       ref: "Users",
       required: true,
     },
+    technicianId: {
+      type: mongoose.Types.ObjectId,
+      ref: "Technician",
+      required: true,
+    },
     jaringanUrl: {
       type: String,
       required: true,
@@ -45,6 +50,10 @@ const SurveyData = new mongoose.Schema(
     standar: {
       type: Boolean,
       required: true,
+    },
+    catatan: {
+      type: String,
+      default: "",
     },
   },
   { timestamps: true }

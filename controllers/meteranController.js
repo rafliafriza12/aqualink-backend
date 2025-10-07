@@ -15,7 +15,7 @@ export const createMeteran = async (req, res) => {
       jatuhTempo,
     } = req.body;
 
-    // Check if connection data is completed
+    // Check if connection data exists
     const connectionData = await ConnectionData.findById(connectionDataId);
     if (!connectionData) {
       return res.status(404).json({
@@ -24,19 +24,29 @@ export const createMeteran = async (req, res) => {
       });
     }
 
-    if (!connectionData.isAllProcedureDone) {
+    // Check if RAB exists (RAB must be created before meteran)
+    if (!connectionData.rabConnectionId) {
       return res.status(400).json({
         status: 400,
-        message: "All procedures must be completed first",
+        message: "RAB must be created first",
       });
     }
 
-    // Check if meteran already exists for this user
-    const existingMeteran = await Meteran.findOne({ userId });
+    // Check if meteran already exists for this connection data
+    const existingMeteran = await Meteran.findOne({ connectionDataId });
     if (existingMeteran) {
       return res.status(400).json({
         status: 400,
-        message: "Meteran already exists for this user",
+        message: "Meteran already exists for this connection data",
+      });
+    }
+
+    // Check if meteran number already exists
+    const existingMeteranNumber = await Meteran.findOne({ noMeteran });
+    if (existingMeteranNumber) {
+      return res.status(400).json({
+        status: 400,
+        message: "Meteran number already exists",
       });
     }
 
@@ -44,12 +54,17 @@ export const createMeteran = async (req, res) => {
       noMeteran,
       kelompokPelangganId,
       userId,
+      connectionDataId,
       totalPemakaian: totalPemakaian || 0,
       pemakaianBelumTerbayar: pemakaianBelumTerbayar || 0,
       jatuhTempo: jatuhTempo || null,
     });
 
     await meteran.save();
+
+    // Update connection data with meteran ID
+    connectionData.meteranId = meteran._id;
+    await connectionData.save();
 
     // Update user with meteran ID, connection data ID, and verify user
     const user = await User.findById(userId);
@@ -58,10 +73,16 @@ export const createMeteran = async (req, res) => {
     user.isVerified = true;
     await user.save();
 
+    // Populate before returning
+    const populatedMeteran = await Meteran.findById(meteran._id)
+      .populate("kelompokPelangganId")
+      .populate("userId", "email fullName noHp")
+      .populate("connectionDataId", "nik alamat");
+
     res.status(201).json({
       status: 201,
       message: "Meteran created successfully",
-      data: meteran,
+      data: populatedMeteran,
     });
   } catch (error) {
     res.status(500).json({
@@ -76,7 +97,8 @@ export const getAllMeteran = async (req, res) => {
   try {
     const meteran = await Meteran.find()
       .populate("kelompokPelangganId")
-      .populate("userId", "email fullName phone");
+      .populate("userId", "email fullName noHp")
+      .populate("connectionDataId", "nik alamat");
 
     res.status(200).json({
       status: 200,
@@ -97,7 +119,8 @@ export const getMeteranById = async (req, res) => {
 
     const meteran = await Meteran.findById(id)
       .populate("kelompokPelangganId")
-      .populate("userId", "email fullName phone");
+      .populate("userId", "email fullName noHp")
+      .populate("connectionDataId", "nik alamat");
 
     if (!meteran) {
       return res.status(404).json({
@@ -121,7 +144,7 @@ export const getMeteranById = async (req, res) => {
 // Get Meteran by User ID
 export const getMeteranByUserId = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     const meteran = await Meteran.findOne({ userId })
       .populate("kelompokPelangganId")

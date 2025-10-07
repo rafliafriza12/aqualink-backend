@@ -9,22 +9,25 @@ import {
 } from "../controllers/surveyDataController.js";
 import { verifyAdmin } from "../middleware/adminAuth.js";
 import { verifyTechnician } from "../middleware/technicianAuth.js";
+import { verifyAdminOrTechnician } from "../middleware/adminOrTechnicianAuth.js";
 import { uploadSurveyDataFiles } from "../middleware/upload.js";
 
 const router = express.Router();
 
-// Technician routes
+// Technician routes (create/update)
 router.post("/", verifyTechnician, uploadSurveyDataFiles, createSurveyData);
 router.put("/:id", verifyTechnician, uploadSurveyDataFiles, updateSurveyData);
 
-// Admin & Technician routes
-router.get("/", verifyAdmin, getAllSurveyData);
-router.get("/:id", verifyAdmin, getSurveyDataById);
+// Admin & Technician routes (read access)
+router.get("/", verifyAdminOrTechnician, getAllSurveyData);
+router.get("/:id", verifyAdminOrTechnician, getSurveyDataById);
 router.get(
   "/connection/:connectionDataId",
-  verifyAdmin,
+  verifyAdminOrTechnician,
   getSurveyDataByConnectionId
 );
+
+// Admin only routes
 router.delete("/:id", verifyAdmin, deleteSurveyData);
 
 export default router;

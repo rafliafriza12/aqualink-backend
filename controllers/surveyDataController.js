@@ -1,6 +1,6 @@
 import SurveyData from "../models/SurveyData.js";
 import ConnectionData from "../models/ConnectionData.js";
-import { uploadToCloudinary } from "../utils/cloudinary.js";
+import { uploadPdfAsImage } from "../utils/cloudinary.js";
 
 // Create Survey Data (Technician)
 export const createSurveyData = async (req, res) => {
@@ -12,7 +12,14 @@ export const createSurveyData = async (req, res) => {
       koordinatLat,
       koordinatLong,
       standar,
+      catatan,
     } = req.body;
+
+    console.log(
+      "[createSurveyData] Request from technician:",
+      req.technicianId
+    );
+    console.log("[createSurveyData] Connection Data ID:", connectionDataId);
 
     // Check if connection data exists and verified by admin
     const connectionData = await ConnectionData.findById(connectionDataId);
@@ -29,6 +36,45 @@ export const createSurveyData = async (req, res) => {
         message: "Connection data must be verified by admin first",
       });
     }
+
+    // Check if technician is assigned to this connection data
+    if (!connectionData.assignedTechnicianId) {
+      return res.status(403).json({
+        status: 403,
+        message:
+          "This connection data has not been assigned to any technician yet",
+      });
+    }
+
+    console.log("[createSurveyData] Checking assignment...");
+    console.log(
+      "[createSurveyData] Assigned technician ID:",
+      connectionData.assignedTechnicianId
+    );
+    console.log("[createSurveyData] Request technician ID:", req.technicianId);
+    console.log(
+      "[createSurveyData] Assigned (string):",
+      connectionData.assignedTechnicianId.toString()
+    );
+    console.log(
+      "[createSurveyData] Request (string):",
+      req.technicianId.toString()
+    );
+
+    if (
+      connectionData.assignedTechnicianId.toString() !==
+      req.technicianId.toString()
+    ) {
+      return res.status(403).json({
+        status: 403,
+        message: "You are not assigned to this connection data",
+      });
+    }
+
+    console.log(
+      "[createSurveyData] Assignment verified for technician:",
+      req.technicianId
+    );
 
     // Check if survey already exists
     const existingSurvey = await SurveyData.findOne({ connectionDataId });
@@ -49,27 +95,31 @@ export const createSurveyData = async (req, res) => {
       return res.status(400).json({
         status: 400,
         message:
-          "All PDF files (jaringan, posisi bak, posisi meteran) are required",
+          "All files (jaringan, posisi bak, posisi meteran) are required",
       });
     }
 
-    // Upload PDF files to Cloudinary
-    const jaringanUrl = await uploadToCloudinary(
+    // Upload PDF/image files to Cloudinary
+    const jaringanUrl = await uploadPdfAsImage(
       req.files.jaringanFile[0].buffer,
-      "aqualink/survey/jaringan"
+      "aqualink/survey/jaringan",
+      req.files.jaringanFile[0].mimetype
     );
-    const posisiBakUrl = await uploadToCloudinary(
+    const posisiBakUrl = await uploadPdfAsImage(
       req.files.posisiBakFile[0].buffer,
-      "aqualink/survey/bak"
+      "aqualink/survey/bak",
+      req.files.posisiBakFile[0].mimetype
     );
-    const posisiMeteranUrl = await uploadToCloudinary(
+    const posisiMeteranUrl = await uploadPdfAsImage(
       req.files.posisiMeteranFile[0].buffer,
-      "aqualink/survey/meteran"
+      "aqualink/survey/meteran",
+      req.files.posisiMeteranFile[0].mimetype
     );
 
     const surveyData = new SurveyData({
       connectionDataId,
       userId: connectionData.userId,
+      technicianId: req.technicianId,
       jaringanUrl,
       diameterPipa: parseInt(diameterPipa),
       posisiBakUrl,
@@ -80,6 +130,7 @@ export const createSurveyData = async (req, res) => {
         long: parseFloat(koordinatLong),
       },
       standar: standar === "true" || standar === true,
+      catatan: catatan || "",
     });
 
     await surveyData.save();
@@ -88,12 +139,18 @@ export const createSurveyData = async (req, res) => {
     connectionData.surveiId = surveyData._id;
     await connectionData.save();
 
+    console.log(
+      "[createSurveyData] Survey created successfully:",
+      surveyData._id
+    );
+
     res.status(201).json({
       status: 201,
       message: "Survey data created successfully",
       data: surveyData,
     });
   } catch (error) {
+    console.error("[createSurveyData] Error:", error);
     res.status(500).json({
       status: 500,
       message: error.message,
@@ -182,24 +239,27 @@ export const updateSurveyData = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Handle PDF file uploads if provided
+    // Handle PDF/image file uploads if provided
     if (req.files) {
       if (req.files.jaringanFile) {
-        updates.jaringanUrl = await uploadToCloudinary(
+        updates.jaringanUrl = await uploadPdfAsImage(
           req.files.jaringanFile[0].buffer,
-          "aqualink/survey/jaringan"
+          "aqualink/survey/jaringan",
+          req.files.jaringanFile[0].mimetype
         );
       }
       if (req.files.posisiBakFile) {
-        updates.posisiBakUrl = await uploadToCloudinary(
+        updates.posisiBakUrl = await uploadPdfAsImage(
           req.files.posisiBakFile[0].buffer,
-          "aqualink/survey/bak"
+          "aqualink/survey/bak",
+          req.files.posisiBakFile[0].mimetype
         );
       }
       if (req.files.posisiMeteranFile) {
-        updates.posisiMeteranUrl = await uploadToCloudinary(
+        updates.posisiMeteranUrl = await uploadPdfAsImage(
           req.files.posisiMeteranFile[0].buffer,
-          "aqualink/survey/meteran"
+          "aqualink/survey/meteran",
+          req.files.posisiMeteranFile[0].mimetype
         );
       }
     }

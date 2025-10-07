@@ -353,7 +353,7 @@ export const getAllBilling = async (req, res) => {
 // Get My Billing (User)
 export const getMyBilling = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     const billing = await Billing.find({ userId })
       .populate({
@@ -413,7 +413,7 @@ export const getBillingById = async (req, res) => {
 // Get Unpaid Billing (User)
 export const getUnpaidBilling = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     const unpaidBilling = await Billing.find({
       userId,
@@ -468,7 +468,7 @@ export const getUnpaidBilling = async (req, res) => {
 export const payBilling = async (req, res) => {
   try {
     const { id } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { paymentMethod } = req.body; // "MANUAL", "TRANSFER", "EWALLET", etc.
 
     const billing = await Billing.findById(id).populate("meteranId");
@@ -564,7 +564,7 @@ export const payBilling = async (req, res) => {
 // Pay All Unpaid Billing (User) - Manual Payment for Multiple Bills
 export const payAllBilling = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
     const { paymentMethod } = req.body; // "MANUAL", "TRANSFER", "EWALLET", etc.
 
     // Get all unpaid billing for this user
@@ -667,7 +667,7 @@ export const payAllBilling = async (req, res) => {
 export const createPayment = async (req, res) => {
   try {
     const { id } = req.params; // billing ID
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     const billing = await Billing.findById(id)
       .populate("meteranId")
@@ -798,7 +798,7 @@ export const createPayment = async (req, res) => {
 // Create Payment with Midtrans for ALL Unpaid Bills (User)
 export const createPaymentForAllBills = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     // Get all unpaid billing
     const unpaidBillings = await Billing.find({

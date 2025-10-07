@@ -1,12 +1,18 @@
 import RabConnection from "../models/RabConnection.js";
 import ConnectionData from "../models/ConnectionData.js";
-import { uploadToCloudinary } from "../utils/cloudinary.js";
-import midtransClient from "midtrans-client";
+import { uploadPdfAsImage } from "../utils/cloudinary.js";
+import midtransClient from "../middleware/midtrans.js";
 
 // Create RAB Connection (Technician)
 export const createRabConnection = async (req, res) => {
   try {
-    const { connectionDataId, totalBiaya } = req.body;
+    const { connectionDataId, totalBiaya, catatan } = req.body;
+
+    console.log(
+      "[createRabConnection] Request from technician:",
+      req.technicianId
+    );
+    console.log("[createRabConnection] Connection Data ID:", connectionDataId);
 
     // Check if connection data exists and verified
     const connectionData = await ConnectionData.findById(connectionDataId);
@@ -37,18 +43,24 @@ export const createRabConnection = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({
         status: 400,
-        message: "RAB PDF file is required",
+        message: "RAB file (PDF/Image) is required",
       });
     }
 
     // Upload RAB document to Cloudinary
-    const rabUrl = await uploadToCloudinary(req.file.buffer, "aqualink/rab");
+    const rabUrl = await uploadPdfAsImage(
+      req.file.buffer,
+      "aqualink/rab",
+      req.file.mimetype
+    );
 
     const rabConnection = new RabConnection({
       connectionDataId,
       userId: connectionData.userId,
+      technicianId: req.technicianId,
       totalBiaya: parseInt(totalBiaya),
       rabUrl,
+      catatan: catatan || "",
     });
 
     await rabConnection.save();
@@ -57,12 +69,18 @@ export const createRabConnection = async (req, res) => {
     connectionData.rabConnectionId = rabConnection._id;
     await connectionData.save();
 
+    console.log(
+      "[createRabConnection] RAB created successfully:",
+      rabConnection._id
+    );
+
     res.status(201).json({
       status: 201,
       message: "RAB connection created successfully",
       data: rabConnection,
     });
   } catch (error) {
+    console.error("[createRabConnection] Error:", error);
     res.status(500).json({
       status: 500,
       message: error.message,
@@ -125,7 +143,7 @@ export const getRabConnectionById = async (req, res) => {
 // Get RAB Connection by User ID
 export const getRabConnectionByUserId = async (req, res) => {
   try {
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     const rabConnection = await RabConnection.findOne({ userId })
       .populate("connectionDataId")
@@ -217,9 +235,10 @@ export const updateRabConnection = async (req, res) => {
 
     // Handle RAB document upload if provided
     if (req.file) {
-      updates.rabUrl = await uploadToCloudinary(
+      updates.rabUrl = await uploadPdfAsImage(
         req.file.buffer,
-        "aqualink/rab"
+        "aqualink/rab",
+        req.file.mimetype
       );
     }
 
@@ -287,7 +306,7 @@ export const deleteRabConnection = async (req, res) => {
 export const createRabPayment = async (req, res) => {
   try {
     const { rabId } = req.params;
-    const userId = req.user.id;
+    const userId = req.user.userId;
 
     // Get RAB data
     const rab = await RabConnection.findById(rabId)
@@ -317,15 +336,12 @@ export const createRabPayment = async (req, res) => {
       });
     }
 
-    // Create order_id dengan format RAB-{rabId}
-    const orderId = `RAB-${rab._id}`;
+    // Create order_id dengan format RAB-{rabId}-{timestamp}
+    // Timestamp memastikan order_id unique untuk setiap attempt pembayaran
+    const timestamp = Date.now();
+    const orderId = `RAB-${rab._id}-${timestamp}`;
 
-    // Initialize Midtrans Snap
-    const snap = new midtransClient.Snap({
-      isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
-      serverKey: process.env.MIDTRANS_SERVER_KEY,
-      clientKey: process.env.MIDTRANS_CLIENT_KEY,
-    });
+    console.log(`📝 Creating payment transaction with order_id: ${orderId}`);
 
     // Midtrans parameter
     const parameter = {
@@ -347,14 +363,22 @@ export const createRabPayment = async (req, res) => {
         },
       ],
       callbacks: {
-        finish: `${process.env.FRONTEND_URL}/rab/success`,
-        error: `${process.env.FRONTEND_URL}/rab/error`,
-        pending: `${process.env.FRONTEND_URL}/rab/pending`,
+        finish: `${
+          process.env.FRONTEND_URL || "http://localhost:3000"
+        }/profile/rab-payment/status`,
+        error: `${
+          process.env.FRONTEND_URL || "http://localhost:3000"
+        }/profile/rab-payment/status`,
+        pending: `${
+          process.env.FRONTEND_URL || "http://localhost:3000"
+        }/profile/rab-payment/status`,
       },
     };
 
-    // Create transaction
-    const transaction = await snap.createTransaction(parameter);
+    // Create transaction using the configured midtransClient
+    const transaction = await midtransClient.createTransaction(parameter);
+
+    console.log(`✅ Payment transaction created successfully: ${orderId}`);
 
     res.status(200).json({
       status: 200,
@@ -367,7 +391,30 @@ export const createRabPayment = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error creating RAB payment:", error);
+    console.error("❌ Error creating RAB payment:", error);
+
+    // Handle specific Midtrans errors
+    if (error.message && error.message.includes("already been taken")) {
+      // Order ID conflict - seharusnya tidak terjadi dengan timestamp, tapi sebagai fallback
+      console.error(
+        "⚠️ Order ID conflict detected, this should not happen with timestamp"
+      );
+      return res.status(409).json({
+        status: 409,
+        message:
+          "Transaksi sedang diproses. Silakan tunggu beberapa saat dan coba lagi.",
+      });
+    }
+
+    // Handle other Midtrans API errors
+    if (error.httpStatusCode) {
+      return res.status(error.httpStatusCode).json({
+        status: error.httpStatusCode,
+        message: error.message || "Midtrans API error",
+      });
+    }
+
+    // Generic error
     res.status(500).json({
       status: 500,
       message: error.message || "Failed to create payment transaction",
