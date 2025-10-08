@@ -2,6 +2,7 @@ import HistoryUsage from "../models/HistoryUsage.js";
 import Meteran from "../models/Meteran.js";
 import Notification from "../models/Notification.js";
 import { toZonedTime, fromZonedTime } from "date-fns-tz";
+import mongoose from "mongoose";
 
 const TZ = "Asia/Jakarta";
 
@@ -103,6 +104,10 @@ export const getHistories = async (req, res) => {
       });
     }
 
+    // Convert string IDs to ObjectId
+    const userObjectId = new mongoose.Types.ObjectId(userId);
+    const meteranObjectId = new mongoose.Types.ObjectId(meteranId);
+
     let startDate;
     let endDate;
     let groupBy;
@@ -200,8 +205,8 @@ export const getHistories = async (req, res) => {
     const histories = await HistoryUsage.aggregate([
       {
         $match: {
-          userId,
-          meteranId,
+          userId: userObjectId,
+          meteranId: meteranObjectId,
           createdAt: { $gte: startDate, $lte: endDate },
         },
       },
@@ -275,8 +280,8 @@ export const getHistories = async (req, res) => {
     const totalUsageToday = await HistoryUsage.aggregate([
       {
         $match: {
-          userId,
-          meteranId,
+          userId: userObjectId,
+          meteranId: meteranObjectId,
           createdAt: { $gte: todayUTC, $lte: endTodayUTC },
         },
       },

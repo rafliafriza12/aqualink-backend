@@ -25,6 +25,14 @@ export const verifyTechnician = async (req, res, next) => {
       });
     }
 
+    // ✅ CRITICAL FIX: Check if token in DB matches the one provided
+    if (technician.token !== token) {
+      return res.status(403).json({
+        status: 403,
+        message: "Invalid token. Please login again.",
+      });
+    }
+
     console.log("[verifyTechnician] Technician found:", technician._id);
 
     req.technician = technician;

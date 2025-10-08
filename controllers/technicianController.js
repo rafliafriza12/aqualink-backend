@@ -144,7 +144,7 @@ export const getTechnicianById = async (req, res) => {
 // Get Technician Profile
 export const getTechnicianProfile = async (req, res) => {
   try {
-    const technicianId = req.technician.id;
+    const technicianId = req.technicianId; // Fixed: was req.technician.id
 
     const technician = await Technician.findById(technicianId).select(
       "-password -token"
@@ -233,7 +233,7 @@ export const deleteTechnician = async (req, res) => {
 // Logout Technician
 export const logoutTechnician = async (req, res) => {
   try {
-    const technicianId = req.technician.id;
+    const technicianId = req.technicianId; // Fixed: was req.technician.id
 
     await Technician.findByIdAndUpdate(technicianId, { token: null });
 

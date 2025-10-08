@@ -56,9 +56,6 @@ export const handlePaymentWebhook = async (req, res) => {
     //   status_code,
     //   gross_amount,
     //   serverKey: serverKey ? `${serverKey.substring(0, 10)}...` : "NOT SET",
-    //   signatureString: `${order_id}${status_code}${gross_amount}[SERVER_KEY]`,
-    //   calculatedHash: hash.substring(0, 20) + "...",
-    //   receivedSignature: signature_key.substring(0, 20) + "...",
     //   match: hash === signature_key,
     // });
 
@@ -144,22 +141,11 @@ async function handleRABPayment(orderId, transactionStatus, notification) {
     let notificationTitle = "";
     let notificationMessage = "";
 
-    switch (transactionStatus) {
-      case "capture":
-        if (notification.fraud_status === "accept") {
-          updateData = {
-            isPaid: true,
-          };
-          notificationTitle = "✅ Pembayaran RAB Berhasil";
-          notificationMessage = `Pembayaran RAB sebesar Rp${parseFloat(
-            notification.gross_amount
-          ).toLocaleString(
-            "id-ID"
-          )} telah berhasil. Pemasangan akan segera dijadwalkan.`;
-        }
-        break;
+    console.log(`📊 Transaction status received: "${transactionStatus}"`);
 
+    switch (transactionStatus) {
       case "settlement":
+        console.log("� Processing SETTLEMENT status...");
         updateData = {
           isPaid: true,
         };
@@ -169,51 +155,112 @@ async function handleRABPayment(orderId, transactionStatus, notification) {
         ).toLocaleString(
           "id-ID"
         )} telah berhasil. Pemasangan akan segera dijadwalkan.`;
+        console.log("✅ SETTLEMENT status, will update isPaid to true");
         break;
 
+      case "capture":
+        console.log("� Processing CAPTURE status...");
+        if (notification.fraud_status === "accept") {
+          notificationTitle = "✅ Pembayaran RAB Berhasil (Capture)";
+          notificationMessage = `Pembayaran RAB sebesar Rp${parseFloat(
+            notification.gross_amount
+          ).toLocaleString(
+            "id-ID"
+          )} telah berhasil (captured). Menunggu settlement.`;
+          console.log(
+            "✅ CAPTURE accepted, but will NOT update isPaid (waiting for settlement)"
+          );
+        } else {
+          console.log(
+            `⚠️ CAPTURE but fraud_status is: ${notification.fraud_status}`
+          );
+        }
+        // Tidak update isPaid, tunggu settlement
+        console.log(
+          "⚠️ Status CAPTURE - no database update, waiting for settlement"
+        );
+        return;
+
       case "pending":
-        updateData = {
-          isPaid: false,
-        };
+        console.log("⏳ Processing PENDING status...");
         notificationTitle = "⏳ Pembayaran RAB Pending";
         notificationMessage = `Pembayaran RAB sedang diproses. Mohon selesaikan pembayaran Anda.`;
-        break;
+        // Tidak update isPaid untuk pending
+        console.log("⚠️ Status PENDING - no database update");
+        return;
 
       case "deny":
       case "cancel":
       case "expire":
-        updateData = {
-          isPaid: false,
-        };
+        console.log(`❌ Processing FAILED status: ${transactionStatus}`);
         notificationTitle = "❌ Pembayaran RAB Gagal";
         notificationMessage = `Pembayaran RAB sebesar Rp${parseFloat(
           notification.gross_amount
         ).toLocaleString("id-ID")} gagal atau dibatalkan. Silakan coba lagi.`;
-        break;
+        // Tidak update isPaid untuk failed status, biarkan tetap false
+        console.log(
+          "⚠️ Status FAILED - no database update, isPaid remains false"
+        );
+        return;
 
       default:
         console.log("⚠️ Unhandled transaction status:", transactionStatus);
+        console.log("⚠️ Will not update RAB status");
         return;
     }
 
-    // Update RAB
-    console.log(`🔄 Updating RAB with data:`, updateData);
-    const updatedRab = await RabConnection.findByIdAndUpdate(
-      rabId,
-      updateData,
-      {
-        new: true, // Return updated document
-      }
-    );
+    // Check if updateData has any fields
+    if (Object.keys(updateData).length === 0) {
+      console.error("❌ No update data to apply!");
+      return;
+    }
 
-    if (updatedRab) {
+    // Update RAB
+    console.log(`🔄 Updating RAB ${rabId} with data:`, updateData);
+
+    try {
+      // Method 1: Update dengan findByIdAndUpdate
+      const updatedRab = await RabConnection.findByIdAndUpdate(
+        rabId,
+        updateData,
+        {
+          new: true, // Return updated document
+          runValidators: true, // Run schema validators
+        }
+      );
+
+      if (!updatedRab) {
+        console.error(
+          `❌ Failed to update RAB: ${rabId} - Document not found after update`
+        );
+        throw new Error(`RAB ${rabId} not found after update`);
+      }
+
       console.log(`✅ RAB updated successfully:`, {
-        rabId: updatedRab._id,
+        rabId: updatedRab._id.toString(),
         isPaid: updatedRab.isPaid,
-        wasUpdated: updatedRab.isPaid !== rab.isPaid,
+        wasChanged: updatedRab.isPaid !== rab.isPaid,
+        oldValue: rab.isPaid,
+        newValue: updatedRab.isPaid,
       });
-    } else {
-      console.error(`❌ Failed to update RAB: ${rabId}`);
+
+      // Verify update dengan re-fetch
+      const verifyRab = await RabConnection.findById(rabId);
+      console.log(
+        `🔍 Verification - RAB isPaid after update:`,
+        verifyRab?.isPaid
+      );
+
+      if (verifyRab?.isPaid !== updateData.isPaid) {
+        console.error(
+          `❌ CRITICAL: Update verification failed! Expected: ${updateData.isPaid}, Got: ${verifyRab?.isPaid}`
+        );
+      } else {
+        console.log(`✅ Update verified successfully!`);
+      }
+    } catch (updateError) {
+      console.error(`❌ Error updating RAB:`, updateError);
+      throw updateError;
     }
 
     // Create notification for user
@@ -229,10 +276,11 @@ async function handleRABPayment(orderId, transactionStatus, notification) {
     }
 
     console.log(
-      `✅ RAB payment webhook processing completed: ${rabId} - Status: ${transactionStatus} - isPaid: ${updatedRab?.isPaid}`
+      `✅ RAB payment webhook processing completed: ${rabId} - Status: ${transactionStatus} - Final isPaid: ${updateData.isPaid}`
     );
   } catch (error) {
     console.error("❌ Error handling RAB payment:", error);
+    console.error("Error stack:", error.stack);
     throw error;
   }
 }

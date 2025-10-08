@@ -20,7 +20,7 @@ export const verifyToken = (req, res, next) => {
 
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("✅ Token verified for user:", decoded.id);
+    console.log("✅ Token verified for user:", decoded.userId);
     req.user = decoded; // Simpan payload ke dalam `req.user` untuk digunakan di fungsi lain
     next();
   } catch (error) {
