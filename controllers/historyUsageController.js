@@ -36,17 +36,11 @@ const getCurrentWeekRange = () => {
 };
 
 // Create History Usage from IoT (IoT Device/System)
+// Supports both single and batch (array) insert
 export const createHistoryUsage = async (req, res) => {
   try {
     const { userId, meteranId } = req.params;
-    const { usedWater } = req.body;
-
-    if (!usedWater || typeof usedWater !== "number") {
-      return res.status(400).json({
-        status: 400,
-        message: "usedWater harus berupa angka",
-      });
-    }
+    const { usedWater, data } = req.body;
 
     // Validasi meteran exists
     const meteran = await Meteran.findById(meteranId);
@@ -65,25 +59,79 @@ export const createHistoryUsage = async (req, res) => {
       });
     }
 
-    const historyUsage = new HistoryUsage({
-      userId,
-      meteranId,
-      usedWater,
-    });
+    let savedRecords = [];
+    let totalWater = 0;
 
-    await historyUsage.save();
+    // Case 1: Batch insert (array of objects)
+    if (data && Array.isArray(data) && data.length > 0) {
+      // Validate array elements
+      const invalidData = data.find(
+        (item) => !item.usedWater || typeof item.usedWater !== "number"
+      );
+
+      if (invalidData) {
+        return res.status(400).json({
+          status: 400,
+          message: "Setiap item dalam array harus memiliki usedWater (number)",
+        });
+      }
+
+      // Prepare bulk insert documents
+      const historyDocuments = data.map((item) => ({
+        userId,
+        meteranId,
+        usedWater: item.usedWater,
+        createdAt: item.timestamp ? new Date(item.timestamp) : new Date(),
+      }));
+
+      // Bulk insert
+      savedRecords = await HistoryUsage.insertMany(historyDocuments);
+
+      // Calculate total water
+      totalWater = data.reduce((sum, item) => sum + item.usedWater, 0);
+
+      console.log(
+        `✅ Batch insert: ${savedRecords.length} records, total: ${totalWater}L`
+      );
+    }
+    // Case 2: Single insert (backward compatibility)
+    else if (usedWater && typeof usedWater === "number") {
+      const historyUsage = new HistoryUsage({
+        userId,
+        meteranId,
+        usedWater,
+      });
+
+      await historyUsage.save();
+      savedRecords = [historyUsage];
+      totalWater = usedWater;
+
+      console.log(`✅ Single insert: ${totalWater}L`);
+    }
+    // Case 3: Invalid request
+    else {
+      return res.status(400).json({
+        status: 400,
+        message: "Harus menyertakan 'usedWater' (number) atau 'data' (array)",
+      });
+    }
 
     // Update total pemakaian di meteran (akumulasi)
-    meteran.totalPemakaian += usedWater;
-    meteran.pemakaianBelumTerbayar += usedWater;
+    meteran.totalPemakaian += totalWater;
+    meteran.pemakaianBelumTerbayar += totalWater;
     await meteran.save();
 
     res.status(201).json({
       status: 201,
-      message: "Data pemakaian air berhasil disimpan",
-      data: historyUsage,
+      message: `Data pemakaian air berhasil disimpan (${savedRecords.length} record)`,
+      data: {
+        count: savedRecords.length,
+        totalWater: totalWater,
+        records: savedRecords,
+      },
     });
   } catch (error) {
+    console.error("Error createHistoryUsage:", error);
     res.status(500).json({
       status: 500,
       message: error.message,

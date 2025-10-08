@@ -1,8 +1,6 @@
 import express from "express";
 import { verifyToken } from "../middleware/auth.js";
 import {
-  generatePairingCode,
-  pairDevice,
   getConnectionStatus,
   disconnectDevice,
   iotHeartbeat,
@@ -11,11 +9,13 @@ import {
 const router = express.Router();
 
 /**
- * User routes (authenticated)
+ * ⚠️ PAIRING ROUTES REMOVED - IoT devices use hardcoded configuration
+ * No need for pairing flow anymore!
  */
 
-// Generate pairing code
-router.post("/generate-pairing-code", verifyToken, generatePairingCode);
+/**
+ * User routes (authenticated)
+ */
 
 // Get connection status
 router.get("/connection-status", verifyToken, getConnectionStatus);
@@ -24,11 +24,8 @@ router.get("/connection-status", verifyToken, getConnectionStatus);
 router.post("/disconnect", verifyToken, disconnectDevice);
 
 /**
- * IoT Device routes (public - called by IoT via bluetooth/wifi)
+ * IoT Device routes (public)
  */
-
-// Pair device with pairing code
-router.post("/pair-device", pairDevice);
 
 // IoT heartbeat/sync
 router.post("/heartbeat", iotHeartbeat);
