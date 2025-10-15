@@ -11,17 +11,7 @@ const Users = new mongoose.Schema(
       type: String,
       required: true,
     },
-    nik: {
-      type: String,
-      default: null,
-      sparse: true, // Allow multiple null values
-      unique: true,
-    },
     phone: {
-      type: String,
-      default: null,
-    },
-    address: {
       type: String,
       default: null,
     },
@@ -34,33 +24,6 @@ const Users = new mongoose.Schema(
       type: String,
       enum: ["active", "inactive", "suspended"],
       default: "active",
-    },
-    gender: {
-      type: String,
-      enum: ["L", "P"],
-      default: null,
-    },
-    birthDate: {
-      type: Date,
-      default: null,
-    },
-    occupation: {
-      type: String,
-      default: null,
-    },
-    location: {
-      latitude: {
-        type: Number,
-        default: null,
-      },
-      longitude: {
-        type: Number,
-        default: null,
-      },
-      address: {
-        type: String,
-        default: null,
-      },
     },
     password: {
       type: String,
